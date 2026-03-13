@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UA | CIT Secure Inventory</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="login-container" class="wrapper">
+        <div class="card login-card">
+            <img src="ua.jpg" alt="University Logo" class="main-logo">
+            <h1>CIT Laboratory Equipment & Inventory</h1>
+            <p class="tagline">Triple DES Secure Vault</p>
+            <hr>
+            <div class="login-fields">
+                <label>Administrative Access Required</label>
+                <input type="password" id="pin-input" placeholder="Enter Admin PIN">
+                <button onclick="checkLogin()" class="btn-primary">Access System</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="security-alert" class="overlay hidden">
+        <div class="alert-box">
+            <h1> SECURITY ALERT</h1>
+            <hr>
+            <h2>AUTHORIZED PERSONNEL ONLY</h2>
+            <p>Access Denied. Incorrect Administrative PIN entered.</p>
+            <button class="btn-danger" onclick="closeAlert()">Try Again</button>
+        </div>
+    </div>
+
+    <div id="dashboard" class="wrapper hidden">
+        <div class="dashboard-header">
+            <div class="header-left">
+                <h2>CIT Inventory Dashboard</h2>
+            </div>
+            <button class="btn-logout" onclick="lockSystem()">Lock & Exit</button>
+        </div>
+
+        <div class="card">
+            <h3>Register New Equipment</h3>
+            <div class="input-row">
+                <input type="text" id="item-name" placeholder="Item Name">
+                <input type="text" id="item-serial" placeholder="Serial Number">
+                <button onclick="addNewItem()" class="btn-add">Encrypt & Save</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Secure Vault (3DES Protected)</h3>
+            <table id="vault-table">
+                <thead>
+                    <tr>
+                        <th>Equipment Name</th>
+                        <th>3DES Encrypted</th>
+                        <th>Decrypted Serial</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="inventory-list"></tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h3>Update Admin PIN</h3>
+            <p>Change Access Pin Regularly to Prevent Unauthorized Access .</p>
+            <div class="input-row">
+                <input type="password" id="new-pin-val" placeholder="Enter New PIN">
+                <button onclick="updatePin()" class="btn-update">Change PIN</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
