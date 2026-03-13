@@ -1,26 +1,23 @@
-// Start with the default PIN in memory
 let currentPin = "1234";
 let vaultData = [];
 
 // ==========================================
-// Triple DES (3DES) Simulation Logic
+// Triple DES (3DES) Simulation (EDE Principle)
 // ==========================================
 function tripleDesSim(text) {
-    let step1 = btoa(text); 
-    let step2 = step1.split('').reverse().join(''); 
-    let step3 = btoa(step2).substring(0, 14).toUpperCase(); 
-    return "3DES-" + step3;
+    let e1 = btoa(text); // Stage 1: Encrypt
+    let d2 = e1.split('').reverse().join(''); // Stage 2: Decrypt (Reverse)
+    let e3 = btoa(d2).substring(0, 14).toUpperCase(); // Stage 3: Encrypt
+    return "3DES-" + e3;
 }
 
-// This function now explicitly checks the UPDATED currentPin
+// ACCESS CONTROL
 function checkLogin() {
-    const enteredPin = document.getElementById('pin-input').value;
-    
-    if (enteredPin === currentPin) {
+    const entered = document.getElementById('pin-input').value;
+    if (entered === currentPin) {
         document.getElementById('login-container').classList.add('hidden');
         document.getElementById('dashboard').classList.remove('hidden');
-        // Clear the input so it's fresh for next time
-        document.getElementById('pin-input').value = "";
+        document.getElementById('pin-input').value = ""; 
     } else {
         document.getElementById('security-alert').classList.remove('hidden');
     }
@@ -28,16 +25,35 @@ function checkLogin() {
 
 function closeAlert() {
     document.getElementById('security-alert').classList.add('hidden');
-    document.getElementById('pin-input').value = "";
 }
 
-// --- NEW LOCK FUNCTION ---
-// This hides the dashboard and shows the login screen WITHOUT refreshing
 function lockSystem() {
     document.getElementById('dashboard').classList.add('hidden');
     document.getElementById('login-container').classList.remove('hidden');
 }
 
+// PIN MODAL LOGIC (New Feature)
+function openPinModal() {
+    document.getElementById('pin-modal').classList.remove('hidden');
+}
+
+function closePinModal() {
+    document.getElementById('pin-modal').classList.add('hidden');
+    document.getElementById('new-pin-field').value = "";
+}
+
+function saveNewPin() {
+    const newPin = document.getElementById('new-pin-field').value;
+    if (newPin !== "") {
+        currentPin = newPin; // Updates the PIN in memory
+        alert("Security Update Successful! Use your new code for the next login.");
+        closePinModal();
+    } else {
+        alert("Action Denied: Field cannot be empty.");
+    }
+}
+
+// INVENTORY MANAGEMENT
 function addNewItem() {
     const name = document.getElementById('item-name').value;
     const serial = document.getElementById('item-serial').value;
@@ -71,15 +87,4 @@ function updateTable() {
 function removeItem(i) {
     vaultData.splice(i, 1);
     updateTable();
-}
-
-function updatePin() {
-    const newPinInput = document.getElementById('new-pin-val').value;
-    if(newPinInput) {
-        currentPin = newPinInput; // Updates the variable in RAM
-        alert("Success! The system PIN has been changed to: " + currentPin);
-        document.getElementById('new-pin-val').value = "";
-    } else {
-        alert("Please enter a value.");
-    }
 }

@@ -11,7 +11,7 @@
     <div id="login-container" class="wrapper">
         <div class="card login-card">
             <img src="ua.jpg" alt="University Logo" class="main-logo">
-            <h1>CIT Laboratory Equipment & Inventory</h1>
+            <h1>CIT Laboratory</h1>
             <p class="tagline">Triple DES Secure Vault</p>
             <hr>
             <div class="login-fields">
@@ -32,45 +32,52 @@
         </div>
     </div>
 
+    <div id="pin-modal" class="overlay hidden">
+        <div class="alert-box modal-box">
+            <h2>Update Security Protocol</h2>
+            <p>Please enter the new administrative access code:</p>
+            <input type="password" id="new-pin-field" placeholder="Enter New PIN">
+            <div class="modal-actions">
+                <button class="btn-add" onclick="saveNewPin()">Save Changes</button>
+                <button class="btn-danger" onclick="closePinModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="dashboard" class="wrapper hidden">
         <div class="dashboard-header">
             <div class="header-left">
                 <h2>CIT Inventory Dashboard</h2>
             </div>
-            <button class="btn-logout" onclick="lockSystem()">Lock & Exit</button>
+            <div class="header-right">
+                <button class="btn-update-header" onclick="openPinModal()">Update PIN</button>
+                <button class="btn-logout" onclick="lockSystem()">Lock & Exit</button>
+            </div>
         </div>
 
         <div class="card">
             <h3>Register New Equipment</h3>
             <div class="input-row">
                 <input type="text" id="item-name" placeholder="Item Name">
-                <input type="text" id="item-serial" placeholder="Serial Number">
+                <input type="text" id="item-serial" placeholder="Serial Number (Sensitive)">
                 <button onclick="addNewItem()" class="btn-add">Encrypt & Save</button>
             </div>
         </div>
 
-        <div class="card">
+        <div class="card table-card">
             <h3>Secure Vault (3DES Protected)</h3>
             <table id="vault-table">
                 <thead>
                     <tr>
                         <th>Equipment Name</th>
-                        <th>3DES Encrypted</th>
+                        <th>3DES Encrypted Value</th>
                         <th>Decrypted Serial</th>
                         <th>Action</th>
                     </tr>
                 </thead>
-                <tbody id="inventory-list"></tbody>
+                <tbody id="inventory-list">
+                    </tbody>
             </table>
-        </div>
-
-        <div class="card">
-            <h3>Update Admin PIN</h3>
-            <p>Change Access Pin Regularly to Prevent Unauthorized Access .</p>
-            <div class="input-row">
-                <input type="password" id="new-pin-val" placeholder="Enter New PIN">
-                <button onclick="updatePin()" class="btn-update">Change PIN</button>
-            </div>
         </div>
     </div>
 

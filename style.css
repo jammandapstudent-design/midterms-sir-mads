@@ -1,5 +1,6 @@
+/* 1. LAYOUT & CENTERING */
 body {
-    background-color: #0f172a; /* Professional dark blue/black */
+    background-color: #0f172a; /* Dark Navy Professional Theme */
     font-family: 'Segoe UI', Arial, sans-serif;
     margin: 0;
     display: flex;
@@ -8,12 +9,12 @@ body {
     min-height: 100vh;
 }
 
-.wrapper { width: 100%; max-width: 900px; padding: 20px; }
+.wrapper { width: 100%; max-width: 1000px; padding: 20px; }
 .hidden { display: none !important; }
 
-/* UA LOGO RESIZING */
+/* 2. LOGO & CARD UI */
 .main-logo {
-    width: 220px; 
+    width: 200px; 
     height: auto;
     margin: 0 auto 15px auto;
     display: block;
@@ -23,15 +24,15 @@ body {
     background: #ffffff;
     border-radius: 12px;
     padding: 30px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
     margin-bottom: 20px;
     text-align: center;
 }
 
-.login-card { max-width: 450px; margin: 0 auto; border-top: 8px solid #003366; }
+.login-card { max-width: 480px; margin: 0 auto; border-top: 8px solid #003366; }
 
 h1 { color: #003366; margin: 0; }
-.tagline { color: #64748b; font-weight: 600; margin-bottom: 20px; }
+.tagline { color: #64748b; font-weight: bold; margin-bottom: 20px; }
 
 input {
     width: 85%;
@@ -50,10 +51,9 @@ button {
     transition: 0.3s;
 }
 
-.btn-primary { background: #003366; color: white; width: 90%; padding: 12px; }
-.btn-primary:hover { background: #0056b3; }
+.btn-primary { background: #003366; color: white; width: 90%; padding: 14px; }
 
-/* Dashboard UI */
+/* 3. DASHBOARD HEADER */
 .dashboard-header {
     background: #003366;
     color: white;
@@ -65,21 +65,22 @@ button {
     margin-bottom: 20px;
 }
 
-.header-left { display: flex; align-items: center; gap: 15px; }
-.header-left h2 { margin: 0; }
+.header-right { display: flex; gap: 12px; }
+
+.btn-update-header { background: #f39c12; color: white; padding: 10px 20px; }
+.btn-update-header:hover { background: #d68910; }
+
+.btn-logout { background: #ef4444; color: white; padding: 10px 20px; }
+.btn-logout:hover { background: #dc2626; }
 
 .input-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-.input-row input { width: 30%; }
-
 .btn-add { background: #10b981; color: white; padding: 10px 20px; }
-.btn-update { background: #f59e0b; color: white; padding: 10px 20px; }
-.btn-logout { background: #ef4444; color: white; padding: 8px 16px; }
 
-/* Alert Overlay */
+/* 4. OVERLAYS & MODALS */
 .overlay {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.95);
+    background: rgba(0,0,0,0.9);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -88,25 +89,18 @@ button {
 
 .alert-box {
     background: white;
-    padding: 50px;
-    border: 8px solid #ef4444;
+    padding: 40px;
     border-radius: 20px;
     text-align: center;
-    color: #ef4444;
+    color: #1e293b;
+    max-width: 400px;
 }
 
-.btn-danger { background: #ef4444; color: white; padding: 12px 30px; margin-top: 20px; }
+.modal-actions { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
 
-/* Table Styles */
+/* 5. TABLE STYLES */
 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
 th, td { padding: 15px; border-bottom: 1px solid #f1f5f9; text-align: left; color: #1e293b; }
-th { background: #f8fafc; color: #003366; }
+th { background: #f8fafc; color: #003366; text-transform: uppercase; font-size: 0.8rem; }
 
-/* The Full 'Delete' Button */
-.btn-delete-row {
-    background: #ef4444;
-    color: white;
-    padding: 6px 15px;
-    font-size: 0.85rem;
-}
-.btn-delete-row:hover { background: #b91c1c; }
+.btn-delete-row { background: #ef4444; color: white; padding: 6px 15px; font-size: 0.85rem; }
