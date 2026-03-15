@@ -16,7 +16,7 @@
             <hr>
             <div class="login-fields">
                 <label>Administrative Access Required</label>
-                <input type="password" id="pin-input" placeholder="Enter Admin PIN">
+                <input type="password" id="pin-input" placeholder="Enter Admin PIN" onkeydown="handleLoginEnter(event)">
                 <button onclick="checkLogin()" class="btn-primary">Access System</button>
             </div>
         </div>
@@ -32,24 +32,16 @@
         </div>
     </div>
 
-    <div id="pin-modal" class="overlay hidden">
-        <div class="alert-box modal-box">
-            <h2>Update Security Protocol</h2>
-            <p>Please enter the new administrative access code:</p>
-            <input type="password" id="new-pin-field" placeholder="Enter New PIN">
-            <div class="modal-actions">
-                <button class="btn-add" onclick="saveNewPin()">Save Changes</button>
-                <button class="btn-danger" onclick="closePinModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
     <div id="dashboard" class="wrapper hidden">
         <div class="dashboard-header">
             <div class="header-left">
                 <h2>CIT Inventory Dashboard</h2>
             </div>
             <div class="header-right">
+                <div class="search-container">
+                    <input type="text" id="search-input" placeholder="Type item name" onkeydown="handleSearch(event)">
+                    <button class="btn-search-icon" onclick="handleSearch({key: 'Enter', preventDefault: ()=>{} })"></button>
+                </div>
                 <button class="btn-update-header" onclick="openPinModal()">Update PIN</button>
                 <button class="btn-logout" onclick="lockSystem()">Lock & Exit</button>
             </div>
@@ -59,13 +51,16 @@
             <h3>Register New Equipment</h3>
             <div class="input-row">
                 <input type="text" id="item-name" placeholder="Item Name">
-                <input type="text" id="item-serial" placeholder="Serial Number">
+                <input type="text" id="item-serial" placeholder="Serial Number" onkeydown="handleAddItemEnter(event)">
                 <button onclick="addNewItem()" class="btn-add">Encrypt & Save</button>
             </div>
         </div>
 
         <div class="card table-card">
-            <h3>Secure Vault (3DES Protected)</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin:0;">Secure Vault (3DES Protected)</h3>
+                <button onclick="updateTable(vaultData)" style="background:none; border: 1px solid #003366; color:#003366; font-size: 0.7rem; padding: 2px 8px; cursor:pointer;">Show All Items</button>
+            </div>
             <table id="vault-table">
                 <thead>
                     <tr>
@@ -75,9 +70,19 @@
                         <th>Action</th>
                     </tr>
                 </thead>
-                <tbody id="inventory-list">
-                    </tbody>
+                <tbody id="inventory-list"></tbody>
             </table>
+        </div>
+    </div>
+
+    <div id="pin-modal" class="overlay hidden">
+        <div class="alert-box">
+            <h2>Update Security Protocol</h2>
+            <input type="password" id="new-pin-field" placeholder="Enter New PIN" onkeydown="handleUpdatePinEnter(event)">
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
+                <button class="btn-add" onclick="saveNewPin()">Save</button>
+                <button class="btn-danger" onclick="closePinModal()">Cancel</button>
+            </div>
         </div>
     </div>
 
