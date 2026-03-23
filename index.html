@@ -14,10 +14,23 @@
             <h1>CIT Laboratory</h1>
             <p class="tagline">Triple DES Secure Vault</p>
             <hr>
-            <div class="login-fields">
+            
+            <div class="tab-container">
+                <button id="tab-admin" class="tab-btn active" onclick="switchTab('admin')">Admin</button>
+                <button id="tab-student" class="tab-btn" onclick="switchTab('student')">Student</button>
+            </div>
+
+            <div id="admin-login-form" class="login-fields">
                 <label>Administrative Access Required</label>
                 <input type="password" id="pin-input" placeholder="Enter Admin PIN" onkeydown="handleLoginEnter(event)">
                 <button onclick="checkLogin()" class="btn-primary">Access System</button>
+            </div>
+
+            <div id="student-login-form" class="login-fields hidden">
+                <label>Student Authentication</label>
+                <input type="text" id="student-name" placeholder="Full Name">
+                <input type="text" id="student-id" placeholder="Student ID" onkeydown="if(event.key === 'Enter') checkStudentLogin()">
+                <button onclick="checkStudentLogin()" class="btn-primary">Student Login</button>
             </div>
         </div>
     </div>
@@ -36,18 +49,19 @@
         <div class="dashboard-header">
             <div class="header-left">
                 <h2>CIT Inventory Dashboard</h2>
+                <div id="user-greeting" class="user-greeting"></div>
             </div>
             <div class="header-right">
                 <div class="search-container">
                     <input type="text" id="search-input" placeholder="Type name & hit Enter..." onkeydown="handleSearch(event)">
                     <button class="btn-search-icon" onclick="handleSearch({key: 'Enter', preventDefault: ()=>{} })"></button>
                 </div>
-                <button class="btn-update-header" onclick="openPinModal()">Update PIN</button>
-                <button class="btn-logout" onclick="lockSystem()">Lock & Exit</button>
+                <button id="btn-update-pin" class="btn-update-header" onclick="openPinModal()">Update PIN</button>
+                <button class="btn-logout" onclick="lockSystem()">Exit</button>
             </div>
         </div>
 
-        <div class="card">
+        <div id="admin-controls" class="card hidden">
             <h3>Register New Equipment</h3>
             <div class="input-row">
                 <input type="text" id="item-name" placeholder="Item Name">
@@ -59,18 +73,10 @@
         <div class="card table-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h3 style="margin:0;">Secure Vault (3DES Protected)</h3>
-                <button onclick="updateTable(vaultData)" style="background:none; border: 1px solid #003366; color:#003366; font-size: 0.7rem; padding: 2px 8px; cursor:pointer;">Show All Items</button>
+                <button onclick="updateTable(vaultData)" style="background:none; border: 1px solid #003366; color:#003366; font-size: 0.7rem; padding: 2px 8px; cursor:pointer; border-radius: 4px;">Show All Items</button>
             </div>
             <table id="vault-table">
-                <thead>
-                    <tr>
-                        <th style="width: 40px;">#</th>
-                        <th>Equipment Name</th>
-                        <th>Serial Number</th>
-                        <th>3DES Encrypted Value</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
+                <thead></thead>
                 <tbody id="inventory-list"></tbody>
             </table>
         </div>
@@ -81,7 +87,7 @@
             <h2>Update Security Protocol</h2>
             <input type="password" id="new-pin-field" placeholder="Enter New PIN" onkeydown="handleUpdatePinEnter(event)">
             <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
-                <button class="btn-add" onclick="saveNewPin()">Save</button>
+                <button class="btn-add" style="margin-top:0;" onclick="saveNewPin()">Save</button>
                 <button class="btn-danger" onclick="closePinModal()">Cancel</button>
             </div>
         </div>

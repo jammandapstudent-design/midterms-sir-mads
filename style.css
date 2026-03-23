@@ -1,3 +1,6 @@
+/* ==========================================
+   GLOBAL STYLES
+   ========================================== */
 body {
     background-color: #0f172a; 
     font-family: 'Segoe UI', Arial, sans-serif;
@@ -8,10 +11,13 @@ body {
     min-height: 100vh;
 }
 
-.wrapper { width: 100%; max-width: 1000px; padding: 20px; }
+.wrapper { width: 100%; max-width: 1000px; padding: 20px; box-sizing: border-box; }
 .hidden { display: none !important; }
 
-.main-logo { width: 180px; margin: 0 auto 15px auto; display: block; }
+/* ==========================================
+   CARDS & CONTAINERS
+   ========================================== */
+.main-logo { width: 120px; margin: 0 auto 15px auto; display: block; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.2)); }
 
 .card {
     background: #ffffff;
@@ -22,39 +28,145 @@ body {
     text-align: center;
 }
 
-.login-card { max-width: 450px; margin: 0 auto; border-top: 8px solid #003366; }
-h1 { color: #003366; margin: 0; }
-.tagline { color: #64748b; font-weight: bold; margin-bottom: 20px; }
+.login-card { 
+    max-width: 450px; 
+    margin: 0 auto; 
+    border-top: 8px solid #003366; 
+}
 
-input { width: 85%; padding: 12px; margin: 10px 0; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem; }
+h1 { color: #003366; margin: 0; font-size: 1.5rem; }
+.tagline { color: #64748b; font-weight: bold; margin-bottom: 20px; font-size: 0.9rem; }
+
+hr { border: 0; height: 1px; background: #e2e8f0; margin: 20px 0; }
+
+/* ==========================================
+   INPUTS & BUTTONS
+   ========================================== */
+input { 
+    width: 85%; 
+    padding: 12px; 
+    margin: 10px auto; 
+    border: 1px solid #cbd5e1; 
+    border-radius: 8px; 
+    font-size: 1rem; 
+    display: block;
+    box-sizing: border-box;
+}
+
+input:focus { outline: 2px solid #003366; border-color: transparent; }
 
 button { cursor: pointer; font-weight: bold; border-radius: 8px; border: none; transition: 0.3s; }
-.btn-primary { background: #003366; color: white; width: 90%; padding: 14px; }
+button:hover { filter: brightness(1.1); }
 
-.dashboard-header {
-    background: #003366; color: white; padding: 15px 25px; border-radius: 12px;
-    display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
-}
-
-.header-right { display: flex; gap: 10px; align-items: center; }
-
-.search-container { 
-    display: flex; align-items: center; background: rgba(255,255,255,0.1); 
-    border-radius: 20px; border: 1px solid rgba(255,255,255,0.3); padding-right: 10px; 
-}
-.search-container input { width: 180px; background: transparent; border: none; color: white; padding: 8px 15px; margin: 0; }
-.search-container input:focus { outline: none; }
-.btn-search-icon { background: transparent; color: white; }
-
+.btn-primary { background: #003366; color: white; width: 85%; padding: 14px; margin-top: 10px; }
 .btn-update-header { background: #f39c12; color: white; padding: 10px 20px; }
 .btn-logout { background: #ef4444; color: white; padding: 10px 20px; }
-.btn-add { background: #10b981; color: white; padding: 10px 20px; }
+.btn-add { background: #10b981; color: white; padding: 12px 30px; margin-top: 15px; }
 .btn-danger { background: #ef4444; color: white; padding: 10px 20px; }
 
-.overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-.alert-box { background: white; padding: 40px; border-radius: 20px; text-align: center; max-width: 400px; color: #1e293b;}
+/* ==========================================
+   LOGIN TABS (NEW)
+   ========================================== */
+.tab-container { 
+    display: flex; 
+    margin: 0 auto 20px auto; 
+    width: 85%; 
+    background: #f1f5f9;
+    border-radius: 8px; 
+    padding: 4px;
+}
+.tab-btn { 
+    flex: 1; 
+    padding: 10px; 
+    background: transparent; 
+    color: #64748b; 
+    border: none; 
+    cursor: pointer; 
+    font-weight: bold; 
+    font-size: 0.9rem; 
+    border-radius: 6px;
+}
+.tab-btn.active { 
+    background: #003366; 
+    color: white; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
 
+.login-fields label { display: block; color: #475569; font-size: 0.85rem; margin-bottom: 5px; }
+
+/* ==========================================
+   DASHBOARD HEADER & GREETING
+   ========================================== */
+.dashboard-header {
+    background: #003366; 
+    color: white; 
+    padding: 15px 25px; 
+    border-radius: 12px;
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 20px;
+}
+
+.dashboard-header h2 { margin: 0; font-size: 1.3rem; }
+.header-right { display: flex; gap: 10px; align-items: center; }
+
+.user-greeting { 
+    font-size: 0.85rem; 
+    color: #cbd5e1; 
+    margin-top: 5px; 
+}
+
+.search-container { 
+    display: flex; 
+    align-items: center; 
+    background: rgba(255,255,255,0.1); 
+    border-radius: 20px; 
+    border: 1px solid rgba(255,255,255,0.3); 
+    padding-right: 10px; 
+}
+.search-container input { width: 180px; background: transparent; border: none; color: white; padding: 8px 15px; margin: 0; border-radius: 20px; }
+.search-container input:focus { outline: none; border-color: transparent; }
+.search-container input::placeholder { color: rgba(255,255,255,0.6); }
+
+/* ==========================================
+   REGISTER EQUIPMENT CARD
+   ========================================== */
+#admin-controls h3 { margin-top: 0; color: #0f172a; }
+.input-row { display: flex; flex-direction: column; align-items: center; }
+.input-row input { width: 100%; max-width: 800px; margin: 8px 0; }
+
+/* ==========================================
+   TABLE STYLES
+   ========================================== */
+.table-card { text-align: left; }
 table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-th, td { padding: 15px; border-bottom: 1px solid #f1f5f9; text-align: left; }
-th { color: #003366; text-transform: uppercase; font-size: 0.75rem; background: #f8fafc; }
-.btn-delete-row { background: #ef4444; color: white; padding: 5px 12px; font-size: 0.75rem; }
+th, td { padding: 15px; border-bottom: 1px solid #f1f5f9; text-align: left; font-size: 0.9rem; }
+th { color: #003366; text-transform: uppercase; font-size: 0.75rem; background: #f8fafc; font-weight: bold; }
+.btn-delete-row { background: transparent; color: #ef4444; border: 1px solid #ef4444; padding: 5px 12px; font-size: 0.75rem; border-radius: 4px;}
+.btn-delete-row:hover { background: #ef4444; color: white; }
+
+/* ==========================================
+   STATUS BADGES & STUDENT ACTIONS (NEW)
+   ========================================== */
+.badge { 
+    padding: 4px 10px; 
+    border-radius: 12px; 
+    font-size: 0.75rem; 
+    font-weight: bold; 
+    color: white; 
+    display: inline-block; 
+}
+.badge-available { background: #10b981; }
+.badge-borrowed { background: #f59e0b; }
+
+.btn-borrow { background: #3b82f6; color: white; padding: 6px 14px; font-size: 0.8rem; border-radius: 6px;}
+.btn-return { background: #8b5cf6; color: white; padding: 6px 14px; font-size: 0.8rem; border-radius: 6px;}
+
+/* ==========================================
+   OVERLAYS & ALERTS
+   ========================================== */
+.overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.9); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.alert-box { background: white; padding: 40px; border-radius: 12px; text-align: center; max-width: 400px; color: #1e293b; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+.alert-box h1, .alert-box h2 { color: #ef4444; }
+.alert-box p { font-weight: bold; color: #475569; }
