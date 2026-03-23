@@ -39,7 +39,7 @@
             </div>
             <div class="header-right">
                 <div class="search-container">
-                    <input type="text" id="search-input" placeholder="Type item name" onkeydown="handleSearch(event)">
+                    <input type="text" id="search-input" placeholder="Type name & hit Enter..." onkeydown="handleSearch(event)">
                     <button class="btn-search-icon" onclick="handleSearch({key: 'Enter', preventDefault: ()=>{} })"></button>
                 </div>
                 <button class="btn-update-header" onclick="openPinModal()">Update PIN</button>
@@ -64,9 +64,10 @@
             <table id="vault-table">
                 <thead>
                     <tr>
+                        <th style="width: 40px;">#</th>
                         <th>Equipment Name</th>
+                        <th>Serial Number</th>
                         <th>3DES Encrypted Value</th>
-                        <th>Decrypted Serial</th>
                         <th>Action</th>
                     </tr>
                 </thead>
