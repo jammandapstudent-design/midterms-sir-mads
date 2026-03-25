@@ -10,7 +10,7 @@
 
     <div id="login-container" class="wrapper">
         <div class="card login-card">
-            <img src="ua.jpg" alt="University Logo" class="main-logo">
+            <img src="ua.jpg" alt="University Logo" class="main-logo" onerror="this.style.display='none'">
             <h1>CIT Laboratory</h1>
             <p class="tagline">Triple DES Secure Vault</p>
             <hr>
@@ -37,7 +37,7 @@
 
     <div id="security-alert" class="overlay hidden">
         <div class="alert-box">
-            <h1> SECURITY ALERT</h1>
+            <h1>⚠️ SECURITY ALERT</h1>
             <hr>
             <h2>AUTHORIZED PERSONNEL ONLY</h2>
             <p>Access Denied. Incorrect Administrative PIN entered.</p>
@@ -52,12 +52,18 @@
                 <div id="user-greeting" class="user-greeting"></div>
             </div>
             <div class="header-right">
-                <div class="search-container">
-                    <input type="text" id="search-input" placeholder="Type name & hit Enter..." onkeydown="handleSearch(event)">
-                    <button class="btn-search-icon" onclick="handleSearch({key: 'Enter', preventDefault: ()=>{} })"></button>
-                </div>
-                <button id="btn-update-pin" class="btn-update-header" onclick="openPinModal()">Update PIN</button>
-                <button class="btn-logout" onclick="lockSystem()">Exit</button>
+                <button id="btn-update-pin" class="btn-update-header hidden" onclick="openPinModal()">Update PIN</button>
+                <button class="btn-logout" onclick="lockSystem()">Exit / Logout</button>
+            </div>
+        </div>
+
+        <div id="audit-log-container" class="card hidden" style="text-align: left; border-left: 5px solid #003366;">
+            <h3 style="margin-top: 0; display: flex; justify-content: space-between;">
+                Security Audit Log
+                <span style="font-size: 0.7rem; color: #64748b;">Live Monitoring</span>
+            </h3>
+            <div id="audit-list" style="max-height: 120px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div style="color: #64748b;">-- Initializing Secure Environment... --</div>
             </div>
         </div>
 
@@ -71,10 +77,15 @@
         </div>
 
         <div class="card table-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div class="table-header-flex">
                 <h3 style="margin:0;">Secure Vault (3DES Protected)</h3>
-                <button onclick="updateTable(vaultData)" style="background:none; border: 1px solid #003366; color:#003366; font-size: 0.7rem; padding: 2px 8px; cursor:pointer; border-radius: 4px;">Show All Items</button>
+                <div class="filter-group">
+                    <button onclick="filterByStatus('All')" class="filter-btn">All</button>
+                    <button onclick="filterByStatus('Available')" class="filter-btn available-btn">Available</button>
+                    <button id="btn-filter-borrowed" onclick="filterByStatus('Borrowed')" class="filter-btn borrowed-btn hidden">Borrowed</button>
+                </div>
             </div>
+            <p id="admin-hint" style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px;" class="hidden">* Admin: Click the 3DES value to decrypt with Master Key.</p>
             <table id="vault-table">
                 <thead></thead>
                 <tbody id="inventory-list"></tbody>
@@ -84,12 +95,27 @@
 
     <div id="pin-modal" class="overlay hidden">
         <div class="alert-box">
-            <h2>Update Security Protocol</h2>
+            <h2>Update Security PIN</h2>
             <input type="password" id="new-pin-field" placeholder="Enter New PIN" onkeydown="handleUpdatePinEnter(event)">
             <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
                 <button class="btn-add" style="margin-top:0;" onclick="saveNewPin()">Save</button>
                 <button class="btn-danger" onclick="closePinModal()">Cancel</button>
             </div>
+        </div>
+    </div>
+
+    <div id="borrow-modal" class="overlay hidden">
+        <div class="alert-box">
+            <h2 style="color: #3b82f6; margin-bottom: 5px;">Borrow Details</h2>
+            <hr>
+            <div style="text-align: left; margin-top: 15px;">
+                <label style="font-size: 0.85rem; color: #64748b; font-weight: bold;">Expected Return Date:</label>
+                <input type="date" id="return-date-field" style="margin-top: 5px;" onkeydown="if(event.key === 'Enter') confirmBorrow()">
+            </div>
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
+    <button class="btn-primary" style="margin: 0; flex: 1; padding: 12px;" onclick="confirmBorrow()">Confirm</button>
+    <button class="btn-danger" style="margin: 0; flex: 1; padding: 12px;" onclick="closeBorrowModal()">Cancel</button>
+</div>
         </div>
     </div>
 

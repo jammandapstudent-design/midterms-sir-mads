@@ -1,392 +1,271 @@
-let currentPin = "1234";
-let vaultData = [];
-
-// Track who is currently logged in
-let currentUserRole = null; // 'admin' or 'student'
+// --- STATE ---
+let currentPin = localStorage.getItem('cit_vault_pin') || "1234";
+let vaultData = JSON.parse(localStorage.getItem('cit_vault_data')) || [];
+let auditLogs = [];
+let currentUserRole = null;
 let currentStudent = { name: '', id: '' };
+let pendingBorrowIndex = -1;
 
-// ==========================================
-// 16-ROUND FEISTEL CIPHER LOGIC (DES SIMULATION)
-// ==========================================
-// Core Concept: The Feistel network is a symmetric structure used in the construction 
-// of block ciphers like DES. Its primary advantage is that encryption and decryption 
-// operations are identical, requiring only a reversal of the key schedule.
-
-/**
- * Performs a bitwise XOR (Exclusive OR) operation between text and a key.
- * In cryptography, XOR is fundamental because it is easily reversible: (A XOR B) XOR B = A.
- */
-function xorStrings(textStr, keyStr) {
-    let result = '';
-    for (let i = 0; i < textStr.length; i++) {
-        // Convert characters to their ASCII integer values
-        let textChar = textStr.charCodeAt(i) || 0;
-        let keyChar = keyStr.charCodeAt(i % keyStr.length) || 0;
-        
-        // XOR the text byte with the key byte
-        result += String.fromCharCode((textChar ^ keyChar) % 256);
+// --- 3DES ENGINE (16-Round Feistel Cipher) ---
+function xorStrings(t, k) {
+    let r = '';
+    for (let i = 0; i < t.length; i++) {
+        r += String.fromCharCode((t.charCodeAt(i) ^ k.charCodeAt(i % k.length)) % 256);
     }
-    return result;
+    return r;
 }
 
-/**
- * Simulates the 16 rounds of processing found in the standard Data Encryption Standard (DES).
- * * Key Mechanics to Note:
- * 1. Block Splitting: The input is split into two halves (Left and Right).
- * 2. The Round Function (f): The Right half is mangled using the Key (via XOR).
- * 3. Swapping: The Left and Right halves are swapped for the next round.
- */
-function runFeistel16(textBlock, key) {
-    // Pad or truncate the input to simulate a fixed 8-character (64-bit) block size
-    let paddedText = textBlock.padEnd(8, ' ').substring(0, 8);
-    
-    // Split the block into Left (L) and Right (R) halves
-    let L = paddedText.substring(0, 4);
-    let R = paddedText.substring(4, 8);
-
-    // Execute 16 identical rounds of substitution and permutation
-    for (let round = 1; round <= 16; round++) {
-        let nextL = R; // The old Right half becomes the new Left half
-        
-        // The Round Function (f): XOR the Right half with the Key
-        let fResult = xorStrings(R, key); 
-        
-        // XOR the result of the function with the old Left half to create the new Right half
-        let nextR = xorStrings(L, fResult); 
-        
-        L = nextL;
-        R = nextR;
+function runFeistel16(block, key) {
+    let padded = block.padEnd(8, ' ').substring(0, 8);
+    let L = padded.substring(0, 4), R = padded.substring(4, 8);
+    for (let i = 0; i < 16; i++) {
+        let temp = R;
+        R = xorStrings(L, xorStrings(R, key));
+        L = temp;
     }
-
-    // After 16 rounds, the final output is recombined (with a final swap of R and L)
-    return R + L; 
+    return R + L;
 }
 
-// ==========================================
-// TRIPLE DES (3DES) IMPLEMENTATION
-// ==========================================
-
-/**
- * Applies the 3DES Encrypt-Decrypt-Encrypt (E-D-E) sequence.
- * * Cryptographic Protocol:
- * To maximize security and maintain backward compatibility with standard DES, 
- * 3DES processes each block three times.
- * * Stage 1: Encrypt with Key 1 (Here, the current Admin PIN)
- * Stage 2: Decrypt with Key 2 (Here, the reversed Admin PIN to simulate a separate key)
- * Stage 3: Encrypt with Key 3 (Here, reusing Key 1, mimicking a 2-key 3DES setup)
- */
 function apply3DES(text) {
-    // Stage 1: Standard Feistel Encryption
-    let stage1 = runFeistel16(text, currentPin); 
-    
-    // Stage 2: Feistel "Decryption" using Key 2 (Reversed PIN)
-    let stage2 = runFeistel16(stage1, currentPin.split('').reverse().join('')); 
-    
-    // Stage 3: Final Feistel Encryption using Key 1
-    let stage3 = runFeistel16(stage2, currentPin); 
-
-    // Encode the final cipher text in Base64 so it can be safely displayed in the HTML table
-    return "3DES-" + btoa(stage3);
+    let s1 = runFeistel16(text, currentPin); 
+    let s2 = runFeistel16(s1, currentPin.split('').reverse().join('')); 
+    let s3 = runFeistel16(s2, currentPin); 
+    return "3DES-" + btoa(s3);
 }
 
-/**
- * Reverses the 3DES sequence using a Decrypt-Encrypt-Decrypt (D-E-D) flow.
- * Because the Feistel network is symmetric, we run the exact same `runFeistel16` 
- * function but apply the key stages in reverse order.
- */
-function decrypt3DES(encryptedString) {
+function decrypt3DES(enc) {
     try {
-        // Strip the identifier prefix and decode from Base64 back to raw cipher text
-        let rawData = atob(encryptedString.replace("3DES-", ""));
-        
-        // Reverse Stage 3: Decrypt with Key 1
-        let step1 = runFeistel16(rawData, currentPin); 
-        
-        // Reverse Stage 2: Encrypt with Key 2 (Reversed PIN)
-        let step2 = runFeistel16(step1, currentPin.split('').reverse().join('')); 
-        
-        // Reverse Stage 1: Decrypt with Key 1
-        let step3 = runFeistel16(step2, currentPin); 
-        
-        // Remove the padding spaces added during the initial block splitting
-        return step3.trim(); 
-    } catch (e) {
-        return "Decryption Error";
-    }
+        let raw = atob(enc.replace("3DES-", ""));
+        let st1 = runFeistel16(raw, currentPin); 
+        let st2 = runFeistel16(st1, currentPin.split('').reverse().join('')); 
+        let st3 = runFeistel16(st2, currentPin); 
+        return st3.trim();
+    } catch (e) { return "Error"; }
 }
 
-// Triggered when the Admin clicks an encrypted value in the table to verify reversibility
-function showDecryption(index) {
-    const item = vaultData[index];
-    const originalSerial = decrypt3DES(item.encrypted);
-    alert(`🔐 DECRYPTION SUCCESSFUL!\n\nEquipment: ${item.equipment}\nEncrypted Value: ${item.encrypted}\n\n🔓 Extracted Serial: ${originalSerial}`);
+// --- LOGGING ---
+function addLog(action, status) {
+    const timestamp = new Date().toLocaleTimeString();
+    let color = '#ef4444'; 
+    if (status === 'SUCCESS') color = '#10b981'; 
+    if (status === 'DELETED') color = '#dc2626'; 
+
+    const logEntry = `[${timestamp}] <span style="color:${color}; font-weight:bold;">${status}</span>: ${action}`;
+    auditLogs.unshift(logEntry); 
+    const logDiv = document.getElementById('audit-list');
+    if (logDiv) logDiv.innerHTML = auditLogs.join('<br>');
 }
 
-// ==========================================
-// ACCESS CONTROL & TABS (RBAC)
-// ==========================================
-// Handles the switching between Admin and Student login panels
-function switchTab(role) {
-    if (role === 'admin') {
-        document.getElementById('admin-login-form').classList.remove('hidden');
-        document.getElementById('student-login-form').classList.add('hidden');
-        document.getElementById('tab-admin').classList.add('active');
-        document.getElementById('tab-student').classList.remove('active');
-    } else {
-        document.getElementById('admin-login-form').classList.add('hidden');
-        document.getElementById('student-login-form').classList.remove('hidden');
-        document.getElementById('tab-admin').classList.remove('active');
-        document.getElementById('tab-student').classList.add('active');
-    }
-}
-
-function handleLoginEnter(event) {
-    if (event.key === "Enter") {
-        const alertOverlay = document.getElementById('security-alert');
-        if (alertOverlay && alertOverlay.classList.contains('hidden')) {
-            event.preventDefault();
-            checkLogin();
-        }
-    }
-}
-
-// Verifies Admin PIN against the stored cryptographic key
+// --- ACCESS CONTROL ---
 function checkLogin() {
     const entered = document.getElementById('pin-input').value;
     if (entered === currentPin) {
         currentUserRole = 'admin';
-        document.getElementById('login-container').classList.add('hidden');
-        document.getElementById('dashboard').classList.remove('hidden');
-        document.getElementById('pin-input').value = ""; 
-        setupDashboardUI();
-        updateTable();
+        addLog("Administrator Login", "SUCCESS");
+        setupUI();
     } else {
+        addLog(`Failed Admin Entry (PIN: ${entered})`, "FAILED");
         document.getElementById('security-alert').classList.remove('hidden');
     }
 }
 
-// Authenticates student credentials
 function checkStudentLogin() {
-    const name = document.getElementById('student-name').value.trim();
+    const n = document.getElementById('student-name').value.trim();
     const sid = document.getElementById('student-id').value.trim();
-    
-    if (name && sid) {
+    if (n && sid) {
         currentUserRole = 'student';
-        currentStudent = { name: name, id: sid };
-        
-        document.getElementById('login-container').classList.add('hidden');
-        document.getElementById('dashboard').classList.remove('hidden');
-        setupDashboardUI();
-        updateTable();
+        currentStudent = { name: n, id: sid };
+        setupUI();
     } else {
-        alert("Please enter both your Name and Student ID.");
+        alert("Please enter both Name and Student ID.");
     }
 }
 
-// Conditionally renders UI elements based on the current user's authorization level
-function setupDashboardUI() {
-    const adminControls = document.getElementById('admin-controls');
-    const updatePinBtn = document.getElementById('btn-update-pin');
-    const greetingBox = document.getElementById('user-greeting'); 
-
-    if (currentUserRole === 'admin') {
-        adminControls.classList.remove('hidden');
-        updatePinBtn.classList.remove('hidden');
-        
-        // Admin greeting
-        greetingBox.innerHTML = `Logged in as: <strong style="color: #f39c12;">Administrator</strong>`;
-    } else {
-        // Obscure administrative tools from student view
-        adminControls.classList.add('hidden');
-        updatePinBtn.classList.add('hidden');
-        
-        // Student greeting 
-        greetingBox.innerHTML = `Welcome, <strong style="color: #10b981;">${currentStudent.name}</strong> | ID: ${currentStudent.id}`;
-    }
-}
-
-function closeAlert() { 
-    document.getElementById('security-alert').classList.add('hidden'); 
-    const pinField = document.getElementById('pin-input');
-    if (pinField) { pinField.value = ""; pinField.focus(); }
-}
-
-function lockSystem() { 
-    document.getElementById('dashboard').classList.add('hidden'); 
-    document.getElementById('login-container').classList.remove('hidden'); 
+function setupUI() {
+    document.getElementById('login-container').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
     
-    // Clear Session Data to prevent unauthorized access
-    currentUserRole = null;
-    currentStudent = { name: '', id: '' };
-    document.getElementById('student-name').value = "";
-    document.getElementById('student-id').value = "";
-    document.getElementById('user-greeting').innerHTML = ""; 
-}
-
-// ==========================================
-// PIN MODAL LOGIC (KEY MANAGEMENT)
-// ==========================================
-function openPinModal() { document.getElementById('pin-modal').classList.remove('hidden'); }
-function closePinModal() { document.getElementById('pin-modal').classList.add('hidden'); document.getElementById('new-pin-field').value = ""; }
-
-function handleUpdatePinEnter(event) {
-    if (event.key === "Enter") { event.preventDefault(); saveNewPin(); }
-}
-
-// Updates the primary encryption key
-function saveNewPin() {
-    const newPin = document.getElementById('new-pin-field').value;
-    if (newPin) { 
-        currentPin = newPin; 
-        alert("PIN Updated! Note: Old items were encrypted with the old PIN."); 
-        closePinModal(); 
-    } else { alert("Field cannot be empty."); }
-}
-
-// ==========================================
-// INVENTORY & BORROWING LOGIC
-// ==========================================
-function handleAddItemEnter(event) {
-    if (event.key === "Enter") { event.preventDefault(); addNewItem(); }
-}
-
-// Captures input, applies 3DES encryption to the serial, and stores the record
-function addNewItem() {
-    const name = document.getElementById('item-name').value;
-    const serial = document.getElementById('item-serial').value;
-    if (name && serial) {
-        vaultData.push({ 
-            equipment: name, 
-            serial: serial, 
-            encrypted: apply3DES(serial), // Run the serial through the cipher sequence
-            status: 'Available',    
-            borrower: ''            
-        });
-        document.getElementById('item-name').value = "";
-        document.getElementById('item-serial').value = "";
-        updateTable();
-    } else { alert("Please fill in both fields."); }
-}
-
-function removeItem(i) {
-    vaultData.splice(i, 1);
+    const isAdmin = (currentUserRole === 'admin');
+    document.getElementById('admin-controls').classList.toggle('hidden', !isAdmin);
+    document.getElementById('audit-log-container').classList.toggle('hidden', !isAdmin);
+    document.getElementById('admin-hint').classList.toggle('hidden', !isAdmin);
+    document.getElementById('btn-update-pin').classList.toggle('hidden', !isAdmin);
+    document.getElementById('btn-filter-borrowed').classList.toggle('hidden', !isAdmin);
+    
+    document.getElementById('user-greeting').innerHTML = isAdmin ? "Admin Dashboard" : `Student: ${currentStudent.name}`;
     updateTable();
 }
 
-function borrowItem(index) {
-    vaultData[index].status = 'Borrowed';
-    vaultData[index].borrower = currentStudent.name;
-    updateTable();
-}
-
-function returnItem(index) {
-    vaultData[index].status = 'Available';
-    vaultData[index].borrower = '';
-    updateTable();
-}
-
-// ==========================================
-// SEARCH LOGIC & DOM RENDERING
-// ==========================================
-function handleSearch(event) {
-    if (event.key === "Enter") {
-        if (event.preventDefault) event.preventDefault();
-        const query = document.getElementById('search-input').value.toLowerCase().trim();
-        const filteredResults = vaultData.filter(item => 
-            item.equipment.toLowerCase().includes(query)
-        );
-        updateTable(filteredResults);
-    }
-}
-
-// Dynamically builds the data table, hiding encrypted values if the user is a student
+// --- TABLE RENDERING ---
 function updateTable(dataToDisplay = vaultData) {
     const thead = document.querySelector('#vault-table thead');
     const list = document.getElementById('inventory-list');
-    
-    // 1. Render Dynamic Headers based on Role
-    if (currentUserRole === 'admin') {
-        thead.innerHTML = `
-            <tr>
-                <th style="width: 40px;">#</th>
-                <th>Equipment Name</th>
-                <th>Serial Number</th>
-                <th>3DES Encrypted Value</th>
-                <th>Status</th>
-                <th>Action</th>
-            </tr>`;
-    } else {
-        thead.innerHTML = `
-            <tr>
-                <th style="width: 40px;">#</th>
-                <th>Equipment Name</th>
-                <th>Status</th>
-                <th>Action</th>
-            </tr>`;
-    }
+    const isAdmin = (currentUserRole === 'admin');
+
+    thead.innerHTML = isAdmin ? 
+        `<tr><th>#</th><th>Equipment</th><th>Encrypted Serial (3DES)</th><th>Status</th><th>Action</th></tr>` : 
+        `<tr><th>#</th><th>Equipment</th><th>Status</th><th>Action</th></tr>`;
 
     list.innerHTML = "";
-    
-    // 2. Render Rows based on Role
     dataToDisplay.forEach((item, index) => {
-        const masterIndex = vaultData.indexOf(item);
-        let rowHTML = `<tr><td style="font-weight: bold; color: #003366;">${index + 1}</td>`;
-
-        if (currentUserRole === 'admin') {
-            // ADMIN VIEW: Full visibility including cleartext and ciphertext
-            rowHTML += `
-                <td><strong>${item.equipment}</strong></td>
-                <td style="color: #10b981; font-weight: bold;">${item.serial}</td>
-                <td style="font-family: monospace; color: #64748b; font-weight: bold; cursor: pointer;" 
-                    onclick="showDecryption(${masterIndex})" title="Click here to test Decryption!">
-                    ${item.encrypted}
-                </td>
-                <td>
-                    <span class="badge ${item.status === 'Available' ? 'badge-available' : 'badge-borrowed'}">
-                        ${item.status} ${item.status === 'Borrowed' ? '(' + item.borrower + ')' : ''}
-                    </span>
-                </td>
-                <td><button onclick="removeItem(${masterIndex})" class="btn-delete-row">Delete</button></td>
-            `;
-        } else {
-            // STUDENT VIEW: Ciphertext and cleartext serials are hidden
-            let actionBtn = "";
-            if (item.status === 'Available') {
-                actionBtn = `<button onclick="borrowItem(${masterIndex})" class="btn-borrow">Borrow</button>`;
-            } else if (item.status === 'Borrowed' && item.borrower === currentStudent.name) {
-                actionBtn = `<button onclick="returnItem(${masterIndex})" class="btn-return">Return Item</button>`;
-            } else {
-                actionBtn = `<span style="color: #ef4444; font-size: 0.8rem; font-weight: bold;">Unavailable</span>`;
+        const mIdx = vaultData.indexOf(item);
+        let row = `<tr><td>${index+1}</td><td><strong>${item.equipment}</strong></td>`;
+        
+        if (isAdmin) {
+            let statusBadge = `<span class="badge ${item.status==='Available'?'badge-available':'badge-borrowed'}">${item.status}</span>`;
+            
+            // Display only borrower and return date
+            if(item.status === 'Borrowed') {
+                statusBadge += `
+                    <div style="margin-top: 8px; font-size: 0.75rem; color: #475569; line-height: 1.5;">
+                        <strong>By:</strong> ${item.borrower}<br>
+                        <strong>Return:</strong> <span style="color: #ef4444;">${item.returnDate}</span>
+                    </div>`;
             }
-
-            rowHTML += `
-                <td><strong>${item.equipment}</strong></td>
-                <td>
-                    <span class="badge ${item.status === 'Available' ? 'badge-available' : 'badge-borrowed'}">
-                        ${item.status}
-                    </span>
-                </td>
-                <td>${actionBtn}</td>
-            `;
+            
+            row += `<td style="cursor:pointer; font-family:monospace; color:#64748b;" onclick="unlockItem(${mIdx})">${item.encrypted}</td>
+                    <td>${statusBadge}</td>
+                    <td><button onclick="removeItem(${mIdx})" class="btn-delete-row">Delete</button></td>`;
+        } else {
+            let btn = item.status === 'Available' ? `<button onclick="borrowItem(${mIdx})" class="btn-borrow">Borrow</button>` : 
+                     (item.borrower === currentStudent.name ? `<button onclick="returnItem(${mIdx})" class="btn-return">Return</button>` : 'Unavailable');
+            row += `<td><span class="badge ${item.status==='Available'?'badge-available':'badge-borrowed'}">${item.status}</span></td>
+                    <td>${btn}</td>`;
         }
-
-        rowHTML += `</tr>`;
-        list.innerHTML += rowHTML;
+        list.innerHTML += row + "</tr>";
     });
 
     if (dataToDisplay.length === 0) {
-        const colSpan = currentUserRole === 'admin' ? 6 : 4;
-        list.innerHTML = `<tr><td colspan="${colSpan}" style="text-align:center; padding:20px; color:#94a3b8;">No records found.</td></tr>`;
+        const colCount = isAdmin ? 5 : 4;
+        list.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center; padding:20px; color:#94a3b8;">No records found.</td></tr>`;
     }
 }
 
-// ==========================================
-// GLOBAL EVENT LISTENER FOR ALERTS
-// ==========================================
-document.addEventListener('keydown', function(event) {
-    const alertOverlay = document.getElementById('security-alert');
-    if (event.key === "Enter" && alertOverlay && !alertOverlay.classList.contains('hidden')) {
-        event.preventDefault(); 
-        closeAlert(); 
+// --- ACTIONS ---
+function addNewItem() {
+    const n = document.getElementById('item-name').value;
+    const s = document.getElementById('item-serial').value;
+    if (n && s) {
+        vaultData.push({ 
+            equipment: n, 
+            encrypted: apply3DES(s), 
+            status: 'Available', 
+            borrower: '',
+            returnDate: ''
+        });
+        addLog(`Registered: ${n}`, "SUCCESS");
+        saveData();
+        document.getElementById('item-name').value = ""; document.getElementById('item-serial').value = "";
+    } else {
+        alert("Please fill in both fields.");
     }
-});
+}
+
+function unlockItem(i) {
+    const key = prompt("MASTER KEY REQUIRED to decrypt 3DES Value:");
+    if (key === currentPin) {
+        addLog(`Decrypted serial for ${vaultData[i].equipment}`, "SUCCESS");
+        alert(`🔓 Extracted Serial: ${decrypt3DES(vaultData[i].encrypted)}`);
+    } else if (key !== null) {
+        addLog(`Invalid Decryption Attempt on ${vaultData[i].equipment}`, "FAILED");
+        alert("Incorrect PIN. Access Denied.");
+    }
+}
+
+function borrowItem(i) { 
+    pendingBorrowIndex = i; 
+    document.getElementById('borrow-modal').classList.remove('hidden'); 
+}
+
+function confirmBorrow() {
+    const rDate = document.getElementById('return-date-field').value;
+    
+    // Check if Return Date is selected
+    if(rDate) {
+        vaultData[pendingBorrowIndex].status = 'Borrowed';
+        vaultData[pendingBorrowIndex].borrower = currentStudent.name;
+        vaultData[pendingBorrowIndex].returnDate = rDate; // Save only the return date
+        
+        saveData(); 
+        closeBorrowModal();
+    } else {
+        alert("⚠️ Please select the expected return date.");
+    }
+}
+
+function returnItem(i) { 
+    vaultData[i].status = 'Available'; 
+    vaultData[i].borrower = ''; 
+    vaultData[i].returnDate = ''; 
+    saveData(); 
+}
+
+function removeItem(i) { 
+    if(confirm("Are you sure you want to permanently delete this item?")) { 
+        const deletedItemName = vaultData[i].equipment;
+        vaultData.splice(i, 1); 
+        addLog(`Permanently deleted: ${deletedItemName}`, "DELETED");
+        saveData(); 
+    } 
+}
+
+function saveData() { 
+    localStorage.setItem('cit_vault_data', JSON.stringify(vaultData)); 
+    updateTable(); 
+}
+
+function filterByStatus(s) { 
+    updateTable(s === 'All' ? vaultData : vaultData.filter(i => i.status === s)); 
+}
+
+function saveNewPin() { 
+    const p = document.getElementById('new-pin-field').value; 
+    
+    if(p) { 
+        currentPin = p; 
+        localStorage.setItem('cit_vault_pin', p); 
+        addLog("Master PIN Changed", "SUCCESS"); 
+        alert("✅ PIN successfully updated!"); 
+        closePinModal(); 
+    } else {
+        alert("⚠️ Please enter a new PIN.");
+    }
+}
+
+function lockSystem() { location.reload(); } 
+
+// --- TAB SWITCHING LOGIC ---
+function switchTab(role) {
+    const isAdmin = (role === 'admin');
+    
+    document.getElementById('admin-login-form').classList.toggle('hidden', !isAdmin);
+    document.getElementById('student-login-form').classList.toggle('hidden', isAdmin);
+    
+    document.getElementById('tab-admin').classList.toggle('active', isAdmin);
+    document.getElementById('tab-student').classList.toggle('active', !isAdmin);
+    
+    document.getElementById('pin-input').value = "";
+    document.getElementById('student-name').value = "";
+    document.getElementById('student-id').value = "";
+}
+
+// --- MODAL & EVENT HELPERS ---
+function closeAlert() { document.getElementById('security-alert').classList.add('hidden'); }
+function openPinModal() { document.getElementById('pin-modal').classList.remove('hidden'); }
+function closePinModal() { document.getElementById('pin-modal').classList.add('hidden'); }
+function closeBorrowModal() { 
+    document.getElementById('borrow-modal').classList.add('hidden'); 
+    
+    // Clear only the return date field
+    document.getElementById('return-date-field').value = '';
+}
+
+// --- KEYBOARD SHORTCUT HELPERS ---
+function handleLoginEnter(e) { if(e.key === 'Enter') checkLogin(); }
+function handleAddItemEnter(e) { if(e.key === 'Enter') addNewItem(); }
+function handleUpdatePinEnter(e) {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        saveNewPin();
+    }
+}
