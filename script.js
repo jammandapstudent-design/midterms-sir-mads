@@ -1,12 +1,21 @@
-// --- STATE ---
+// STATE
 let currentPin = localStorage.getItem('cit_vault_pin') || "1234";
 let vaultData = JSON.parse(localStorage.getItem('cit_vault_data')) || [];
-let auditLogs = [];
+
+vaultData.forEach(item => {
+    if (item.encrypted && !item.serials) {
+        item.serials = Array(item.quantity || 1).fill(item.encrypted);
+        delete item.encrypted;
+    }
+});
+localStorage.setItem('cit_vault_data', JSON.stringify(vaultData));
+
+let auditLogs = JSON.parse(localStorage.getItem('cit_audit_logs')) || [];
 let currentUserRole = null;
 let currentStudent = { name: '', id: '' };
 let pendingBorrowIndex = -1;
 
-// --- 3DES ENGINE (16-Round Feistel Cipher) ---
+// 3DES ENGINE
 function xorStrings(t, k) {
     let r = '';
     for (let i = 0; i < t.length; i++) {
@@ -27,36 +36,47 @@ function runFeistel16(block, key) {
 }
 
 function apply3DES(text) {
-    let s1 = runFeistel16(text, currentPin); 
-    let s2 = runFeistel16(s1, currentPin.split('').reverse().join('')); 
-    let s3 = runFeistel16(s2, currentPin); 
+    let s1 = runFeistel16(text, currentPin);
+    let s2 = runFeistel16(s1, currentPin.split('').reverse().join(''));
+    let s3 = runFeistel16(s2, currentPin);
     return "3DES-" + btoa(s3);
 }
 
 function decrypt3DES(enc) {
     try {
         let raw = atob(enc.replace("3DES-", ""));
-        let st1 = runFeistel16(raw, currentPin); 
-        let st2 = runFeistel16(st1, currentPin.split('').reverse().join('')); 
-        let st3 = runFeistel16(st2, currentPin); 
+        let st1 = runFeistel16(raw, currentPin);
+        let st2 = runFeistel16(st1, currentPin.split('').reverse().join(''));
+        let st3 = runFeistel16(st2, currentPin);
         return st3.trim();
     } catch (e) { return "Error"; }
 }
 
-// --- LOGGING ---
-function addLog(action, status) {
-    const timestamp = new Date().toLocaleTimeString();
-    let color = '#ef4444'; 
-    if (status === 'SUCCESS') color = '#10b981'; 
-    if (status === 'DELETED') color = '#dc2626'; 
-
-    const logEntry = `[${timestamp}] <span style="color:${color}; font-weight:bold;">${status}</span>: ${action}`;
-    auditLogs.unshift(logEntry); 
+// LOGGING
+function renderAuditLogs() {
     const logDiv = document.getElementById('audit-list');
-    if (logDiv) logDiv.innerHTML = auditLogs.join('<br>');
+    if (logDiv) {
+        if (auditLogs.length > 0) {
+            logDiv.innerHTML = auditLogs.join('<br>');
+        } else {
+            logDiv.innerHTML = '<div style="color: #64748b;"> Initializing Secure Environment </div>';
+        }
+    }
 }
 
-// --- ACCESS CONTROL ---
+function addLog(action, status) {
+    const timestamp = new Date().toLocaleTimeString();
+    let color = '#ef4444';
+    if (status === 'SUCCESS') color = '#10b981';
+    if (status === 'DELETED') color = '#dc2626';
+
+    const logEntry = `[${timestamp}] <span style="color:${color}; font-weight:bold;">${status}</span>: ${action}`;
+    auditLogs.unshift(logEntry);
+    localStorage.setItem('cit_audit_logs', JSON.stringify(auditLogs));
+    renderAuditLogs();
+}
+
+// ACCESS CONTROL
 function checkLogin() {
     const entered = document.getElementById('pin-input').value;
     if (entered === currentPin) {
@@ -84,188 +104,247 @@ function checkStudentLogin() {
 function setupUI() {
     document.getElementById('login-container').classList.add('hidden');
     document.getElementById('dashboard').classList.remove('hidden');
-    
+   
     const isAdmin = (currentUserRole === 'admin');
     document.getElementById('admin-controls').classList.toggle('hidden', !isAdmin);
     document.getElementById('audit-log-container').classList.toggle('hidden', !isAdmin);
     document.getElementById('admin-hint').classList.toggle('hidden', !isAdmin);
     document.getElementById('btn-update-pin').classList.toggle('hidden', !isAdmin);
     document.getElementById('btn-filter-borrowed').classList.toggle('hidden', !isAdmin);
-    
-    document.getElementById('user-greeting').innerHTML = isAdmin ? "Admin Dashboard" : `Student: ${currentStudent.name}`;
+   
+    document.getElementById('user-greeting').innerHTML = isAdmin 
+        ? "Admin Dashboard" 
+        : `Student: <span style="color: #10b981;">${currentStudent.name}</span> ID: <span style="color: #10b981;">${currentStudent.id}</span>`;
+        
+    if (isAdmin) renderAuditLogs();
     updateTable();
 }
 
-// --- TABLE RENDERING ---
+// TABLE RENDERING
 function updateTable(dataToDisplay = vaultData) {
     const thead = document.querySelector('#vault-table thead');
     const list = document.getElementById('inventory-list');
     const isAdmin = (currentUserRole === 'admin');
 
-    thead.innerHTML = isAdmin ? 
-        `<tr><th>#</th><th>Equipment</th><th>Encrypted Serial (3DES)</th><th>Status</th><th>Action</th></tr>` : 
-        `<tr><th>#</th><th>Equipment</th><th>Status</th><th>Action</th></tr>`;
+    thead.innerHTML = isAdmin ?
+        `<tr><th>#</th><th>Equipment</th><th>Qty</th><th>Encrypted Serial (3DES)</th><th>Status</th><th>Action</th></tr>` :
+        `<tr><th>#</th><th>Equipment</th><th>Qty</th><th>Status</th><th>Action</th></tr>`;
 
     list.innerHTML = "";
     dataToDisplay.forEach((item, index) => {
         const mIdx = vaultData.indexOf(item);
-        let row = `<tr><td>${index+1}</td><td><strong>${item.equipment}</strong></td>`;
+        const qty = item.quantity || 1; 
         
+        let row = `<tr><td>${index+1}</td><td><strong>${item.equipment}</strong></td><td>${qty}</td>`;
+       
+        let penaltyText = "";
+        if (item.status === 'Borrowed' && item.returnDate) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); 
+            const returnD = new Date(item.returnDate + "T00:00:00"); 
+
+            const diffDays = Math.ceil((today - returnD) / (1000 * 60 * 60 * 24));
+
+            if (diffDays > 0) {
+                const totalPenalty = diffDays * 50 * qty;
+                penaltyText = `<br><span style="color: #ef4444; font-size: 0.75rem;"> Overdue: ₱${totalPenalty}</span>`;
+            } else {
+                penaltyText = `<br><small style="color: #64748b;">Due: ${item.returnDate}</small>`;
+            }
+        }
+
         if (isAdmin) {
             let statusBadge = `<span class="badge ${item.status==='Available'?'badge-available':'badge-borrowed'}">${item.status}</span>`;
-            
-            // Display only borrower and return date
             if(item.status === 'Borrowed') {
-                statusBadge += `
-                    <div style="margin-top: 8px; font-size: 0.75rem; color: #475569; line-height: 1.5;">
-                        <strong>By:</strong> ${item.borrower}<br>
-                        <strong>Return:</strong> <span style="color: #ef4444;">${item.returnDate}</span>
-                    </div>`;
+                statusBadge += `<br><small>By: ${item.borrower}</small>`;
+                statusBadge += penaltyText; 
             }
-            
-            row += `<td style="cursor:pointer; font-family:monospace; color:#64748b;" onclick="unlockItem(${mIdx})">${item.encrypted}</td>
+           
+            let displaySerial = item.serials.length > 1 ? `[${item.serials.length} Serials Hidden]` : item.serials[0];
+
+            row += `<td style="cursor:pointer; font-family:monospace; color:#64748b;" onclick="unlockItem(${mIdx})">${displaySerial}</td>
                     <td>${statusBadge}</td>
                     <td><button onclick="removeItem(${mIdx})" class="btn-delete-row">Delete</button></td>`;
         } else {
-            let btn = item.status === 'Available' ? `<button onclick="borrowItem(${mIdx})" class="btn-borrow">Borrow</button>` : 
+            let btn = item.status === 'Available' ? `<button onclick="borrowItem(${mIdx})" class="btn-borrow">Borrow</button>` :
                      (item.borrower === currentStudent.name ? `<button onclick="returnItem(${mIdx})" class="btn-return">Return</button>` : 'Unavailable');
-            row += `<td><span class="badge ${item.status==='Available'?'badge-available':'badge-borrowed'}">${item.status}</span></td>
+            
+            let studentStatusBadge = `<span class="badge ${item.status==='Available'?'badge-available':'badge-borrowed'}">${item.status}</span>`;
+            if(item.status === 'Borrowed') studentStatusBadge += penaltyText;
+
+            row += `<td>${studentStatusBadge}</td>
                     <td>${btn}</td>`;
         }
         list.innerHTML += row + "</tr>";
     });
-
-    if (dataToDisplay.length === 0) {
-        const colCount = isAdmin ? 5 : 4;
-        list.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center; padding:20px; color:#94a3b8;">No records found.</td></tr>`;
-    }
 }
 
-// --- ACTIONS ---
+// ACTIONS
 function addNewItem() {
-    const n = document.getElementById('item-name').value;
-    const s = document.getElementById('item-serial').value;
-    if (n && s) {
+    const n = document.getElementById('item-name').value.trim();
+    const q = parseInt(document.getElementById('item-quantity').value) || 1;
+    const s = document.getElementById('item-serial').value.trim();
+
+    if (n && s && q) {
+        let serialList = s.split(',').map(str => str.trim()).filter(Boolean);
+
+        if (serialList.length > 1 && serialList.length !== q) {
+            alert(`Mismatch! You entered Qty: ${q}, but provided ${serialList.length} serial numbers.`);
+            return;
+        }
+
+        if (serialList.length === 1 && q > 1) {
+            serialList = Array(q).fill(serialList[0]);
+        }
+
+        const encryptedSerials = serialList.map(serial => apply3DES(serial));
+
         vaultData.push({ 
             equipment: n, 
-            encrypted: apply3DES(s), 
+            quantity: q, 
+            serials: encryptedSerials, 
             status: 'Available', 
-            borrower: '',
-            returnDate: ''
+            borrower: '' 
         });
-        addLog(`Registered: ${n}`, "SUCCESS");
+
+        addLog(`Registered: ${n} (Qty: ${q})`, "SUCCESS");
         saveData();
-        document.getElementById('item-name').value = ""; document.getElementById('item-serial').value = "";
-    } else {
-        alert("Please fill in both fields.");
+        document.getElementById('item-name').value = ""; 
+        document.getElementById('item-quantity').value = "1"; 
+        document.getElementById('item-serial').value = "";
     }
 }
 
 function unlockItem(i) {
-    const key = prompt("MASTER KEY REQUIRED to decrypt 3DES Value:");
+    const key = prompt("MASTER KEY REQUIRED:");
     if (key === currentPin) {
-        addLog(`Decrypted serial for ${vaultData[i].equipment}`, "SUCCESS");
-        alert(`🔓 Extracted Serial: ${decrypt3DES(vaultData[i].encrypted)}`);
+        addLog(`Decrypted serials for ${vaultData[i].equipment}`, "SUCCESS");
+        
+        const decrypted = vaultData[i].serials.map(enc => decrypt3DES(enc)).join('\n');
+        alert(` Serial(s):\n${decrypted}`);
     } else if (key !== null) {
-        addLog(`Invalid Decryption Attempt on ${vaultData[i].equipment}`, "FAILED");
-        alert("Incorrect PIN. Access Denied.");
+        addLog(`Invalid Decryption Attempt`, "FAILED");
+        alert("Incorrect PIN.");
     }
 }
 
 function borrowItem(i) { 
     pendingBorrowIndex = i; 
+    const item = vaultData[i];
+    
+    const qtyField = document.getElementById('borrow-qty-field');
+    qtyField.max = item.quantity || 1;
+    qtyField.value = 1;
+    
     document.getElementById('borrow-modal').classList.remove('hidden'); 
 }
 
 function confirmBorrow() {
-    const rDate = document.getElementById('return-date-field').value;
+    const date = document.getElementById('return-date-field').value;
+    const qtyToBorrow = parseInt(document.getElementById('borrow-qty-field').value) || 1;
+    let item = vaultData[pendingBorrowIndex];
     
-    // Check if Return Date is selected
-    if(rDate) {
-        vaultData[pendingBorrowIndex].status = 'Borrowed';
-        vaultData[pendingBorrowIndex].borrower = currentStudent.name;
-        vaultData[pendingBorrowIndex].returnDate = rDate; // Save only the return date
+    if(date) {
+        if (qtyToBorrow > item.quantity || qtyToBorrow < 1) {
+            alert("Invalid quantity requested.");
+            return;
+        }
+
+        if (qtyToBorrow < item.quantity) {
+            let borrowedSerials = item.serials.splice(0, qtyToBorrow);
+            item.quantity -= qtyToBorrow;
+            
+            vaultData.push({
+                equipment: item.equipment,
+                serials: borrowedSerials,
+                quantity: qtyToBorrow,
+                status: 'Borrowed',
+                borrower: currentStudent.name,
+                returnDate: date 
+            });
+        } else {
+            item.status = 'Borrowed';
+            item.borrower = currentStudent.name;
+            item.returnDate = date; 
+        }
         
         saveData(); 
         closeBorrowModal();
     } else {
-        alert("⚠️ Please select the expected return date.");
+        alert("Please select a return date.");
     }
 }
 
 function returnItem(i) { 
-    vaultData[i].status = 'Available'; 
-    vaultData[i].borrower = ''; 
-    vaultData[i].returnDate = ''; 
+    let returningItem = vaultData[i];
+
+    if (returningItem.returnDate) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const returnD = new Date(returningItem.returnDate + "T00:00:00");
+        const diffDays = Math.ceil((today - returnD) / (1000 * 60 * 60 * 24));
+
+        if (diffDays > 0) {
+            const totalPenalty = diffDays * 50 * (returningItem.quantity || 1);
+            alert(` OVERDUE ITEM DETECTED!\n\nPlease proceed to the Administrator to pay the penalty fee of ₱${totalPenalty}.`);
+        }
+    }
+
+    returningItem.status = 'Available'; 
+    returningItem.borrower = ''; 
+    delete returningItem.returnDate; 
+    
+    let merged = false;
+    for (let j = 0; j < vaultData.length; j++) {
+        if (i !== j && 
+            vaultData[j].status === 'Available' && 
+            vaultData[j].equipment === returningItem.equipment) {
+            
+            vaultData[j].quantity += returningItem.quantity;
+            vaultData[j].serials = vaultData[j].serials.concat(returningItem.serials);
+            vaultData.splice(i, 1); 
+            merged = true;
+            break; 
+        }
+    }
+    
     saveData(); 
 }
 
-function removeItem(i) { 
-    if(confirm("Are you sure you want to permanently delete this item?")) { 
-        const deletedItemName = vaultData[i].equipment;
-        vaultData.splice(i, 1); 
-        addLog(`Permanently deleted: ${deletedItemName}`, "DELETED");
-        saveData(); 
-    } 
-}
-
-function saveData() { 
-    localStorage.setItem('cit_vault_data', JSON.stringify(vaultData)); 
-    updateTable(); 
-}
-
-function filterByStatus(s) { 
-    updateTable(s === 'All' ? vaultData : vaultData.filter(i => i.status === s)); 
-}
+function removeItem(i) { if(confirm("Delete item?")) { vaultData.splice(i, 1); addLog("Item Deleted", "DELETED"); saveData(); } }
+function saveData() { localStorage.setItem('cit_vault_data', JSON.stringify(vaultData)); updateTable(); }
+function filterByStatus(s) { updateTable(s === 'All' ? vaultData : vaultData.filter(i => i.status === s)); }
 
 function saveNewPin() { 
     const p = document.getElementById('new-pin-field').value; 
-    
-    if(p) { 
+    if (p) { 
         currentPin = p; 
         localStorage.setItem('cit_vault_pin', p); 
-        addLog("Master PIN Changed", "SUCCESS"); 
-        alert("✅ PIN successfully updated!"); 
+        addLog("PIN Changed", "SUCCESS"); 
+        alert(" PIN successfully updated!"); 
         closePinModal(); 
     } else {
-        alert("⚠️ Please enter a new PIN.");
+        alert(" Please enter a new PIN.");
     }
 }
 
-function lockSystem() { location.reload(); } 
+function lockSystem() { location.reload(); }
 
-// --- TAB SWITCHING LOGIC ---
 function switchTab(role) {
     const isAdmin = (role === 'admin');
-    
     document.getElementById('admin-login-form').classList.toggle('hidden', !isAdmin);
     document.getElementById('student-login-form').classList.toggle('hidden', isAdmin);
-    
     document.getElementById('tab-admin').classList.toggle('active', isAdmin);
     document.getElementById('tab-student').classList.toggle('active', !isAdmin);
-    
     document.getElementById('pin-input').value = "";
     document.getElementById('student-name').value = "";
     document.getElementById('student-id').value = "";
 }
 
-// --- MODAL & EVENT HELPERS ---
 function closeAlert() { document.getElementById('security-alert').classList.add('hidden'); }
 function openPinModal() { document.getElementById('pin-modal').classList.remove('hidden'); }
 function closePinModal() { document.getElementById('pin-modal').classList.add('hidden'); }
-function closeBorrowModal() { 
-    document.getElementById('borrow-modal').classList.add('hidden'); 
-    
-    // Clear only the return date field
-    document.getElementById('return-date-field').value = '';
-}
-
-// --- KEYBOARD SHORTCUT HELPERS ---
+function closeBorrowModal() { document.getElementById('borrow-modal').classList.add('hidden'); }
 function handleLoginEnter(e) { if(e.key === 'Enter') checkLogin(); }
 function handleAddItemEnter(e) { if(e.key === 'Enter') addNewItem(); }
-function handleUpdatePinEnter(e) {
-    if (e.key === "Enter") {
-        e.preventDefault();
-        saveNewPin();
-    }
-}
+function handleUpdatePinEnter(e) { if(e.key === 'Enter') { e.preventDefault(); saveNewPin(); } }

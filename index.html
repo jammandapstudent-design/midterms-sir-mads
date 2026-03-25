@@ -37,7 +37,7 @@
 
     <div id="security-alert" class="overlay hidden">
         <div class="alert-box">
-            <h1>⚠️ SECURITY ALERT</h1>
+            <h1> SECURITY ALERT</h1>
             <hr>
             <h2>AUTHORIZED PERSONNEL ONLY</h2>
             <p>Access Denied. Incorrect Administrative PIN entered.</p>
@@ -69,10 +69,11 @@
 
         <div id="admin-controls" class="card hidden">
             <h3>Register New Equipment</h3>
-            <div class="input-row">
-                <input type="text" id="item-name" placeholder="Item Name">
-                <input type="text" id="item-serial" placeholder="Serial Number" onkeydown="handleAddItemEnter(event)">
-                <button onclick="addNewItem()" class="btn-add">Encrypt & Save</button>
+            <div class="input-row" style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="item-name" placeholder="Item Name" style="margin: 0; flex: 2;">
+                <input type="number" id="item-quantity" placeholder="Qty" value="1" min="1" style="margin: 0; flex: 1;">
+                <input type="text" id="item-serial" placeholder="Serial Number" onkeydown="handleAddItemEnter(event)" style="margin: 0; flex: 2;">
+                <button onclick="addNewItem()" class="btn-add" style="margin: 0; padding: 12px 15px;">Add</button>
             </div>
         </div>
 
@@ -106,16 +107,17 @@
 
     <div id="borrow-modal" class="overlay hidden">
         <div class="alert-box">
-            <h2 style="color: #3b82f6; margin-bottom: 5px;">Borrow Details</h2>
-            <hr>
-            <div style="text-align: left; margin-top: 15px;">
-                <label style="font-size: 0.85rem; color: #64748b; font-weight: bold;">Expected Return Date:</label>
-                <input type="date" id="return-date-field" style="margin-top: 5px;" onkeydown="if(event.key === 'Enter') confirmBorrow()">
-            </div>
+            <h2 style="color: #3b82f6;">Borrow Item</h2>
+            <p style="margin-bottom: 5px; font-weight: bold;">When will you return this?</p>
+            <input type="date" id="return-date-field" onkeydown="if(event.key === 'Enter') confirmBorrow()">
+            
+            <p style="margin-bottom: 5px; margin-top: 15px; font-weight: bold;">Quantity to Borrow:</p>
+            <input type="number" id="borrow-qty-field" value="1" min="1" onkeydown="if(event.key === 'Enter') confirmBorrow()">
+
             <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
-    <button class="btn-primary" style="margin: 0; flex: 1; padding: 12px;" onclick="confirmBorrow()">Confirm</button>
-    <button class="btn-danger" style="margin: 0; flex: 1; padding: 12px;" onclick="closeBorrowModal()">Cancel</button>
-</div>
+                <button class="btn-primary" style="margin: 0; flex: 1; padding: 12px;" onclick="confirmBorrow()">Confirm</button>
+                <button class="btn-danger" style="margin: 0; flex: 1; padding: 12px;" onclick="closeBorrowModal()">Cancel</button>
+            </div>
         </div>
     </div>
 
