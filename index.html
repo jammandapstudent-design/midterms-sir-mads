@@ -37,7 +37,7 @@
 
     <div id="security-alert" class="overlay hidden">
         <div class="alert-box">
-            <h1> SECURITY ALERT</h1>
+            <h1>⚠️ SECURITY ALERT</h1>
             <hr>
             <h2>AUTHORIZED PERSONNEL ONLY</h2>
             <p>Access Denied. Incorrect Administrative PIN entered.</p>
@@ -52,6 +52,7 @@
                 <div id="user-greeting" class="user-greeting"></div>
             </div>
             <div class="header-right">
+                <button id="btn-update-master" class="btn-update-header hidden" onclick="openMasterKeyModal()" style="background: #8b5cf6;">Update Master Key</button>
                 <button id="btn-update-pin" class="btn-update-header hidden" onclick="openPinModal()">Update PIN</button>
                 <button class="btn-logout" onclick="lockSystem()">Exit / Logout</button>
             </div>
@@ -63,7 +64,7 @@
                 <span style="font-size: 0.7rem; color: #64748b;">Live Monitoring</span>
             </h3>
             <div id="audit-list" style="max-height: 120px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
-                <div style="color: #64748b;">-- Initializing Secure Environment... --</div>
+                <div style="color: #64748b;"> Initializing Secure Environment </div>
             </div>
         </div>
 
@@ -86,7 +87,7 @@
                     <button id="btn-filter-borrowed" onclick="filterByStatus('Borrowed')" class="filter-btn borrowed-btn hidden">Borrowed</button>
                 </div>
             </div>
-            <p id="admin-hint" style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px;" class="hidden">* Admin: Click the 3DES value to decrypt with Master Key.</p>
+            <p id="admin-hint" style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px;" class="hidden">Admin click the 3DES value to decrypt with Master Key.</p>
             <table id="vault-table">
                 <thead></thead>
                 <tbody id="inventory-list"></tbody>
@@ -94,9 +95,22 @@
         </div>
     </div>
 
+    <div id="master-key-modal" class="overlay hidden">
+        <div class="alert-box">
+            <h2>Update Master Key</h2>
+            <input type="password" id="old-master-key-field" placeholder="Enter Old Master Key">
+            <input type="password" id="new-master-key-field" placeholder="Enter New Master Key" onkeydown="if(event.key === 'Enter') saveMasterKey()">
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
+                <button class="btn-add" style="margin-top:0;" onclick="saveMasterKey()">Save</button>
+                <button class="btn-danger" onclick="closeMasterKeyModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="pin-modal" class="overlay hidden">
         <div class="alert-box">
             <h2>Update Security PIN</h2>
+            <input type="password" id="old-pin-field" placeholder="Enter Old PIN">
             <input type="password" id="new-pin-field" placeholder="Enter New PIN" onkeydown="handleUpdatePinEnter(event)">
             <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
                 <button class="btn-add" style="margin-top:0;" onclick="saveNewPin()">Save</button>

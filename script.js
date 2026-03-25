@@ -1,5 +1,5 @@
-// STATE
 let currentPin = localStorage.getItem('cit_vault_pin') || "1234";
+let masterKey = localStorage.getItem('cit_master_key') || currentPin;
 let vaultData = JSON.parse(localStorage.getItem('cit_vault_data')) || [];
 
 vaultData.forEach(item => {
@@ -15,7 +15,6 @@ let currentUserRole = null;
 let currentStudent = { name: '', id: '' };
 let pendingBorrowIndex = -1;
 
-// 3DES ENGINE
 function xorStrings(t, k) {
     let r = '';
     for (let i = 0; i < t.length; i++) {
@@ -36,23 +35,22 @@ function runFeistel16(block, key) {
 }
 
 function apply3DES(text) {
-    let s1 = runFeistel16(text, currentPin);
-    let s2 = runFeistel16(s1, currentPin.split('').reverse().join(''));
-    let s3 = runFeistel16(s2, currentPin);
+    let s1 = runFeistel16(text, masterKey);
+    let s2 = runFeistel16(s1, masterKey.split('').reverse().join(''));
+    let s3 = runFeistel16(s2, masterKey);
     return "3DES-" + btoa(s3);
 }
 
 function decrypt3DES(enc) {
     try {
         let raw = atob(enc.replace("3DES-", ""));
-        let st1 = runFeistel16(raw, currentPin);
-        let st2 = runFeistel16(st1, currentPin.split('').reverse().join(''));
-        let st3 = runFeistel16(st2, currentPin);
+        let st1 = runFeistel16(raw, masterKey);
+        let st2 = runFeistel16(st1, masterKey.split('').reverse().join(''));
+        let st3 = runFeistel16(st2, masterKey);
         return st3.trim();
     } catch (e) { return "Error"; }
 }
 
-// LOGGING
 function renderAuditLogs() {
     const logDiv = document.getElementById('audit-list');
     if (logDiv) {
@@ -70,18 +68,17 @@ function addLog(action, status) {
     if (status === 'SUCCESS') color = '#10b981';
     if (status === 'DELETED') color = '#dc2626';
 
-    const logEntry = `[${timestamp}] <span style="color:${color}; font-weight:bold;">${status}</span>: ${action}`;
+    const logEntry = `[${timestamp}] <span style="color:${color}; font-weight:normal;">${status}</span>: ${action}`;
     auditLogs.unshift(logEntry);
     localStorage.setItem('cit_audit_logs', JSON.stringify(auditLogs));
     renderAuditLogs();
 }
 
-// ACCESS CONTROL
 function checkLogin() {
     const entered = document.getElementById('pin-input').value;
     if (entered === currentPin) {
         currentUserRole = 'admin';
-        addLog("Administrator Login", "SUCCESS");
+        addLog("Admin Dashboard Accessed", "SUCCESS");
         setupUI();
     } else {
         addLog(`Failed Admin Entry (PIN: ${entered})`, "FAILED");
@@ -95,6 +92,10 @@ function checkStudentLogin() {
     if (n && sid) {
         currentUserRole = 'student';
         currentStudent = { name: n, id: sid };
+        
+        // This records the student login in the background
+        addLog(`Student Login: ${n} (ID: ${sid})`, "SUCCESS");
+        
         setupUI();
     } else {
         alert("Please enter both Name and Student ID.");
@@ -110,6 +111,7 @@ function setupUI() {
     document.getElementById('audit-log-container').classList.toggle('hidden', !isAdmin);
     document.getElementById('admin-hint').classList.toggle('hidden', !isAdmin);
     document.getElementById('btn-update-pin').classList.toggle('hidden', !isAdmin);
+    document.getElementById('btn-update-master').classList.toggle('hidden', !isAdmin);
     document.getElementById('btn-filter-borrowed').classList.toggle('hidden', !isAdmin);
    
     document.getElementById('user-greeting').innerHTML = isAdmin 
@@ -120,7 +122,6 @@ function setupUI() {
     updateTable();
 }
 
-// TABLE RENDERING
 function updateTable(dataToDisplay = vaultData) {
     const thead = document.querySelector('#vault-table thead');
     const list = document.getElementById('inventory-list');
@@ -179,7 +180,6 @@ function updateTable(dataToDisplay = vaultData) {
     });
 }
 
-// ACTIONS
 function addNewItem() {
     const n = document.getElementById('item-name').value.trim();
     const q = parseInt(document.getElementById('item-quantity').value) || 1;
@@ -217,14 +217,14 @@ function addNewItem() {
 
 function unlockItem(i) {
     const key = prompt("MASTER KEY REQUIRED:");
-    if (key === currentPin) {
+    if (key === masterKey) {
         addLog(`Decrypted serials for ${vaultData[i].equipment}`, "SUCCESS");
         
         const decrypted = vaultData[i].serials.map(enc => decrypt3DES(enc)).join('\n');
-        alert(` Serial(s):\n${decrypted}`);
+        alert(`🔓 Serial(s):\n${decrypted}`);
     } else if (key !== null) {
         addLog(`Invalid Decryption Attempt`, "FAILED");
-        alert("Incorrect PIN.");
+        alert("Incorrect Master Key.");
     }
 }
 
@@ -268,6 +268,9 @@ function confirmBorrow() {
             item.returnDate = date; 
         }
         
+        // This records the specific item being borrowed
+        addLog(`Borrowed by ${currentStudent.name}: ${item.equipment} (Qty: ${qtyToBorrow})`, "SUCCESS");
+        
         saveData(); 
         closeBorrowModal();
     } else {
@@ -290,6 +293,9 @@ function returnItem(i) {
         }
     }
 
+    // This records the item being returned
+    addLog(`Returned by ${returningItem.borrower}: ${returningItem.equipment}`, "SUCCESS");
+
     returningItem.status = 'Available'; 
     returningItem.borrower = ''; 
     delete returningItem.returnDate; 
@@ -311,20 +317,49 @@ function returnItem(i) {
     saveData(); 
 }
 
-function removeItem(i) { if(confirm("Delete item?")) { vaultData.splice(i, 1); addLog("Item Deleted", "DELETED"); saveData(); } }
+function removeItem(i) { if(confirm("Delete item?")) { addLog(`Item Deleted: ${vaultData[i].equipment}`, "DELETED"); vaultData.splice(i, 1); saveData(); } }
 function saveData() { localStorage.setItem('cit_vault_data', JSON.stringify(vaultData)); updateTable(); }
 function filterByStatus(s) { updateTable(s === 'All' ? vaultData : vaultData.filter(i => i.status === s)); }
 
 function saveNewPin() { 
-    const p = document.getElementById('new-pin-field').value; 
-    if (p) { 
-        currentPin = p; 
-        localStorage.setItem('cit_vault_pin', p); 
+    const oldPin = document.getElementById('old-pin-field').value;
+    const newPin = document.getElementById('new-pin-field').value; 
+    
+    if (!oldPin || !newPin) {
+        alert("Please fill in both fields.");
+        return;
+    }
+
+    if (oldPin === currentPin) { 
+        currentPin = newPin; 
+        localStorage.setItem('cit_vault_pin', currentPin); 
         addLog("PIN Changed", "SUCCESS"); 
-        alert(" PIN successfully updated!"); 
+        alert("PIN successfully updated!"); 
         closePinModal(); 
     } else {
-        alert(" Please enter a new PIN.");
+        addLog("Failed PIN Update", "FAILED");
+        alert("Incorrect Old PIN.");
+    }
+}
+
+function saveMasterKey() {
+    const oldKey = document.getElementById('old-master-key-field').value;
+    const newKey = document.getElementById('new-master-key-field').value;
+    
+    if (!oldKey || !newKey) {
+        alert("Please fill in both fields.");
+        return;
+    }
+    
+    if (oldKey === masterKey) {
+        masterKey = newKey;
+        localStorage.setItem('cit_master_key', masterKey);
+        addLog("Master Key Changed", "SUCCESS");
+        alert("Master Key successfully updated! Old items still require the old key.");
+        closeMasterKeyModal();
+    } else {
+        addLog("Failed Master Key Update", "FAILED");
+        alert("Incorrect Old Master Key.");
     }
 }
 
@@ -343,7 +378,17 @@ function switchTab(role) {
 
 function closeAlert() { document.getElementById('security-alert').classList.add('hidden'); }
 function openPinModal() { document.getElementById('pin-modal').classList.remove('hidden'); }
-function closePinModal() { document.getElementById('pin-modal').classList.add('hidden'); }
+function closePinModal() { 
+    document.getElementById('pin-modal').classList.add('hidden'); 
+    document.getElementById('old-pin-field').value = '';
+    document.getElementById('new-pin-field').value = '';
+}
+function openMasterKeyModal() { document.getElementById('master-key-modal').classList.remove('hidden'); }
+function closeMasterKeyModal() { 
+    document.getElementById('master-key-modal').classList.add('hidden'); 
+    document.getElementById('old-master-key-field').value = '';
+    document.getElementById('new-master-key-field').value = '';
+}
 function closeBorrowModal() { document.getElementById('borrow-modal').classList.add('hidden'); }
 function handleLoginEnter(e) { if(e.key === 'Enter') checkLogin(); }
 function handleAddItemEnter(e) { if(e.key === 'Enter') addNewItem(); }
