@@ -2,9 +2,10 @@ let currentPin = localStorage.getItem('cit_vault_pin') || "1234";
 let masterKey = localStorage.getItem('cit_master_key') || currentPin;
 let vaultData = JSON.parse(localStorage.getItem('cit_vault_data')) || [];
 
+// Safely format any old data to the new structure
 vaultData.forEach(item => {
     if (item.encrypted && !item.serials) {
-        item.serials = Array(item.quantity || 1).fill(item.encrypted);
+        item.serials = [item.encrypted];
         delete item.encrypted;
     }
 });
@@ -63,7 +64,8 @@ function renderAuditLogs() {
 }
 
 function addLog(action, status) {
-    const timestamp = new Date().toLocaleTimeString();
+    // UPDATED: Now uses toLocaleString() to display both Date and Time
+    const timestamp = new Date().toLocaleString(); 
     let color = '#ef4444';
     if (status === 'SUCCESS') color = '#10b981';
     if (status === 'DELETED') color = '#dc2626';
@@ -93,7 +95,6 @@ function checkStudentLogin() {
         currentUserRole = 'student';
         currentStudent = { name: n, id: sid };
         
-        // This records the student login in the background
         addLog(`Student Login: ${n} (ID: ${sid})`, "SUCCESS");
         
         setupUI();
@@ -128,15 +129,14 @@ function updateTable(dataToDisplay = vaultData) {
     const isAdmin = (currentUserRole === 'admin');
 
     thead.innerHTML = isAdmin ?
-        `<tr><th>#</th><th>Equipment</th><th>Qty</th><th>Encrypted Serial (3DES)</th><th>Status</th><th>Action</th></tr>` :
-        `<tr><th>#</th><th>Equipment</th><th>Qty</th><th>Status</th><th>Action</th></tr>`;
+        `<tr><th>#</th><th>Equipment</th><th>Encrypted Serial (3DES)</th><th>Status</th><th>Action</th></tr>` :
+        `<tr><th>#</th><th>Equipment</th><th>Status</th><th>Action</th></tr>`;
 
     list.innerHTML = "";
     dataToDisplay.forEach((item, index) => {
         const mIdx = vaultData.indexOf(item);
-        const qty = item.quantity || 1; 
         
-        let row = `<tr><td>${index+1}</td><td><strong>${item.equipment}</strong></td><td>${qty}</td>`;
+        let row = `<tr><td>${index+1}</td><td><strong>${item.equipment}</strong></td>`;
        
         let penaltyText = "";
         if (item.status === 'Borrowed' && item.returnDate) {
@@ -147,7 +147,7 @@ function updateTable(dataToDisplay = vaultData) {
             const diffDays = Math.ceil((today - returnD) / (1000 * 60 * 60 * 24));
 
             if (diffDays > 0) {
-                const totalPenalty = diffDays * 50 * qty;
+                const totalPenalty = diffDays * 50; 
                 penaltyText = `<br><span style="color: #ef4444; font-size: 0.75rem;"> Overdue: ₱${totalPenalty}</span>`;
             } else {
                 penaltyText = `<br><small style="color: #64748b;">Due: ${item.returnDate}</small>`;
@@ -182,36 +182,25 @@ function updateTable(dataToDisplay = vaultData) {
 
 function addNewItem() {
     const n = document.getElementById('item-name').value.trim();
-    const q = parseInt(document.getElementById('item-quantity').value) || 1;
     const s = document.getElementById('item-serial').value.trim();
 
-    if (n && s && q) {
+    if (n && s) {
         let serialList = s.split(',').map(str => str.trim()).filter(Boolean);
-
-        if (serialList.length > 1 && serialList.length !== q) {
-            alert(`Mismatch! You entered Qty: ${q}, but provided ${serialList.length} serial numbers.`);
-            return;
-        }
-
-        if (serialList.length === 1 && q > 1) {
-            serialList = Array(q).fill(serialList[0]);
-        }
-
         const encryptedSerials = serialList.map(serial => apply3DES(serial));
 
         vaultData.push({ 
             equipment: n, 
-            quantity: q, 
             serials: encryptedSerials, 
             status: 'Available', 
             borrower: '' 
         });
 
-        addLog(`Registered: ${n} (Qty: ${q})`, "SUCCESS");
+        addLog(`Registered: ${n}`, "SUCCESS");
         saveData();
         document.getElementById('item-name').value = ""; 
-        document.getElementById('item-quantity').value = "1"; 
         document.getElementById('item-serial').value = "";
+    } else {
+        alert("Please enter both the item name and serial number.");
     }
 }
 
@@ -230,46 +219,19 @@ function unlockItem(i) {
 
 function borrowItem(i) { 
     pendingBorrowIndex = i; 
-    const item = vaultData[i];
-    
-    const qtyField = document.getElementById('borrow-qty-field');
-    qtyField.max = item.quantity || 1;
-    qtyField.value = 1;
-    
     document.getElementById('borrow-modal').classList.remove('hidden'); 
 }
 
 function confirmBorrow() {
     const date = document.getElementById('return-date-field').value;
-    const qtyToBorrow = parseInt(document.getElementById('borrow-qty-field').value) || 1;
     let item = vaultData[pendingBorrowIndex];
     
     if(date) {
-        if (qtyToBorrow > item.quantity || qtyToBorrow < 1) {
-            alert("Invalid quantity requested.");
-            return;
-        }
-
-        if (qtyToBorrow < item.quantity) {
-            let borrowedSerials = item.serials.splice(0, qtyToBorrow);
-            item.quantity -= qtyToBorrow;
-            
-            vaultData.push({
-                equipment: item.equipment,
-                serials: borrowedSerials,
-                quantity: qtyToBorrow,
-                status: 'Borrowed',
-                borrower: currentStudent.name,
-                returnDate: date 
-            });
-        } else {
-            item.status = 'Borrowed';
-            item.borrower = currentStudent.name;
-            item.returnDate = date; 
-        }
+        item.status = 'Borrowed';
+        item.borrower = currentStudent.name;
+        item.returnDate = date; 
         
-        // This records the specific item being borrowed
-        addLog(`Borrowed by ${currentStudent.name}: ${item.equipment} (Qty: ${qtyToBorrow})`, "SUCCESS");
+        addLog(`Borrowed by ${currentStudent.name}: ${item.equipment}`, "SUCCESS");
         
         saveData(); 
         closeBorrowModal();
@@ -288,31 +250,16 @@ function returnItem(i) {
         const diffDays = Math.ceil((today - returnD) / (1000 * 60 * 60 * 24));
 
         if (diffDays > 0) {
-            const totalPenalty = diffDays * 50 * (returningItem.quantity || 1);
+            const totalPenalty = diffDays * 50;
             alert(` OVERDUE ITEM DETECTED!\n\nPlease proceed to the Administrator to pay the penalty fee of ₱${totalPenalty}.`);
         }
     }
 
-    // This records the item being returned
     addLog(`Returned by ${returningItem.borrower}: ${returningItem.equipment}`, "SUCCESS");
 
     returningItem.status = 'Available'; 
     returningItem.borrower = ''; 
     delete returningItem.returnDate; 
-    
-    let merged = false;
-    for (let j = 0; j < vaultData.length; j++) {
-        if (i !== j && 
-            vaultData[j].status === 'Available' && 
-            vaultData[j].equipment === returningItem.equipment) {
-            
-            vaultData[j].quantity += returningItem.quantity;
-            vaultData[j].serials = vaultData[j].serials.concat(returningItem.serials);
-            vaultData.splice(i, 1); 
-            merged = true;
-            break; 
-        }
-    }
     
     saveData(); 
 }
