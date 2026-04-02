@@ -1,21 +1,40 @@
-let currentPin = localStorage.getItem('cit_vault_pin') || "1234";
-let masterKey = localStorage.getItem('cit_master_key') || currentPin;
-let vaultData = JSON.parse(localStorage.getItem('cit_vault_data')) || [];
+const API_URL = 'http://localhost:5000/api';
 
-// Safely format any old data to the new structure
-vaultData.forEach(item => {
-    if (item.encrypted && !item.serials) {
-        item.serials = [item.encrypted];
-        delete item.encrypted;
-    }
-});
-localStorage.setItem('cit_vault_data', JSON.stringify(vaultData));
-
-let auditLogs = JSON.parse(localStorage.getItem('cit_audit_logs')) || [];
+// --- STATE ---
+let currentPin = "1234";
+let masterKey = "1234";
+let vaultData = [];
+let auditLogs = [];
 let currentUserRole = null;
 let currentStudent = { name: '', id: '' };
-let pendingBorrowIndex = -1;
+let pendingBorrowId = null;
 
+// --- INITIALIZE FROM BACKEND ---
+async function initApp() {
+    try {
+        // 1. Fetch Config (PIN & Master Key)
+        const configRes = await fetch(`${API_URL}/config`);
+        const config = await configRes.json();
+        currentPin = config.pin || "1234";
+        masterKey = config.masterKey || "1234";
+
+        // 2. Fetch Inventory Items
+        const itemsRes = await fetch(`${API_URL}/items`);
+        vaultData = await itemsRes.json();
+
+        // 3. Fetch Audit Logs
+        const logsRes = await fetch(`${API_URL}/logs`);
+        auditLogs = await logsRes.json();
+
+    } catch (error) {
+        console.error("⚠️ Make sure your Node backend is running!", error);
+    }
+}
+
+// Run this immediately when the page loads
+window.onload = initApp;
+
+// --- 3DES ENGINE ---
 function xorStrings(t, k) {
     let r = '';
     for (let i = 0; i < t.length; i++) {
@@ -52,30 +71,43 @@ function decrypt3DES(enc) {
     } catch (e) { return "Error"; }
 }
 
+// --- LOGGING TO DATABASE ---
 function renderAuditLogs() {
     const logDiv = document.getElementById('audit-list');
     if (logDiv) {
         if (auditLogs.length > 0) {
-            logDiv.innerHTML = auditLogs.join('<br>');
+            logDiv.innerHTML = auditLogs.map(log => {
+                let color = '#ef4444';
+                if (log.status === 'SUCCESS') color = '#10b981';
+                if (log.status === 'DELETED') color = '#dc2626';
+                return `[${log.timestamp}] <span style="color:${color}; font-weight:normal;">${log.status}</span>: ${log.action}`;
+            }).join('<br>');
         } else {
             logDiv.innerHTML = '<div style="color: #64748b;"> Initializing Secure Environment </div>';
         }
     }
 }
 
-function addLog(action, status) {
-    // UPDATED: Now uses toLocaleString() to display both Date and Time
+async function addLog(action, status) {
     const timestamp = new Date().toLocaleString(); 
-    let color = '#ef4444';
-    if (status === 'SUCCESS') color = '#10b981';
-    if (status === 'DELETED') color = '#dc2626';
+    const newLog = { action, status, timestamp };
 
-    const logEntry = `[${timestamp}] <span style="color:${color}; font-weight:normal;">${status}</span>: ${action}`;
-    auditLogs.unshift(logEntry);
-    localStorage.setItem('cit_audit_logs', JSON.stringify(auditLogs));
-    renderAuditLogs();
+    // Send to Backend
+    try {
+        const res = await fetch(`${API_URL}/logs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newLog)
+        });
+        const savedLog = await res.json();
+        
+        // Update Frontend
+        auditLogs.unshift(savedLog);
+        renderAuditLogs();
+    } catch(err) { console.error(err); }
 }
 
+// --- ACCESS CONTROL ---
 function checkLogin() {
     const entered = document.getElementById('pin-input').value;
     if (entered === currentPin) {
@@ -94,9 +126,7 @@ function checkStudentLogin() {
     if (n && sid) {
         currentUserRole = 'student';
         currentStudent = { name: n, id: sid };
-        
         addLog(`Student Login: ${n} (ID: ${sid})`, "SUCCESS");
-        
         setupUI();
     } else {
         alert("Please enter both Name and Student ID.");
@@ -123,6 +153,7 @@ function setupUI() {
     updateTable();
 }
 
+// --- TABLE RENDERING ---
 function updateTable(dataToDisplay = vaultData) {
     const thead = document.querySelector('#vault-table thead');
     const list = document.getElementById('inventory-list');
@@ -134,8 +165,6 @@ function updateTable(dataToDisplay = vaultData) {
 
     list.innerHTML = "";
     dataToDisplay.forEach((item, index) => {
-        const mIdx = vaultData.indexOf(item);
-        
         let row = `<tr><td>${index+1}</td><td><strong>${item.equipment}</strong></td>`;
        
         let penaltyText = "";
@@ -143,7 +172,6 @@ function updateTable(dataToDisplay = vaultData) {
             const today = new Date();
             today.setHours(0, 0, 0, 0); 
             const returnD = new Date(item.returnDate + "T00:00:00"); 
-
             const diffDays = Math.ceil((today - returnD) / (1000 * 60 * 60 * 24));
 
             if (diffDays > 0) {
@@ -163,12 +191,13 @@ function updateTable(dataToDisplay = vaultData) {
            
             let displaySerial = item.serials.length > 1 ? `[${item.serials.length} Serials Hidden]` : item.serials[0];
 
-            row += `<td style="cursor:pointer; font-family:monospace; color:#64748b;" onclick="unlockItem(${mIdx})">${displaySerial}</td>
+            // Uses item._id from MongoDB
+            row += `<td style="cursor:pointer; font-family:monospace; color:#64748b;" onclick="unlockItem('${item._id}')">${displaySerial}</td>
                     <td>${statusBadge}</td>
-                    <td><button onclick="removeItem(${mIdx})" class="btn-delete-row">Delete</button></td>`;
+                    <td><button onclick="removeItem('${item._id}')" class="btn-delete-row">Delete</button></td>`;
         } else {
-            let btn = item.status === 'Available' ? `<button onclick="borrowItem(${mIdx})" class="btn-borrow">Borrow</button>` :
-                     (item.borrower === currentStudent.name ? `<button onclick="returnItem(${mIdx})" class="btn-return">Return</button>` : 'Unavailable');
+            let btn = item.status === 'Available' ? `<button onclick="borrowItem('${item._id}')" class="btn-borrow">Borrow</button>` :
+                     (item.borrower === currentStudent.name ? `<button onclick="returnItem('${item._id}')" class="btn-return">Return</button>` : 'Unavailable');
             
             let studentStatusBadge = `<span class="badge ${item.status==='Available'?'badge-available':'badge-borrowed'}">${item.status}</span>`;
             if(item.status === 'Borrowed') studentStatusBadge += penaltyText;
@@ -180,7 +209,8 @@ function updateTable(dataToDisplay = vaultData) {
     });
 }
 
-function addNewItem() {
+// --- DATABASE ACTIONS ---
+async function addNewItem() {
     const n = document.getElementById('item-name').value.trim();
     const s = document.getElementById('item-serial').value.trim();
 
@@ -188,28 +218,42 @@ function addNewItem() {
         let serialList = s.split(',').map(str => str.trim()).filter(Boolean);
         const encryptedSerials = serialList.map(serial => apply3DES(serial));
 
-        vaultData.push({ 
+        const newItem = { 
             equipment: n, 
             serials: encryptedSerials, 
             status: 'Available', 
-            borrower: '' 
-        });
+            borrower: '',
+            returnDate: ''
+        };
 
-        addLog(`Registered: ${n}`, "SUCCESS");
-        saveData();
-        document.getElementById('item-name').value = ""; 
-        document.getElementById('item-serial').value = "";
+        try {
+            // POST to backend
+            const res = await fetch(`${API_URL}/items`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newItem)
+            });
+            const savedItem = await res.json();
+            
+            vaultData.push(savedItem); // Add DB version with _id
+            addLog(`Registered: ${n}`, "SUCCESS");
+            updateTable();
+
+            document.getElementById('item-name').value = ""; 
+            document.getElementById('item-serial').value = "";
+        } catch(err) { console.error(err); alert("Error saving to database."); }
     } else {
         alert("Please enter both the item name and serial number.");
     }
 }
 
-function unlockItem(i) {
+function unlockItem(id) {
     const key = prompt("MASTER KEY REQUIRED:");
+    const item = vaultData.find(i => i._id === id);
+
     if (key === masterKey) {
-        addLog(`Decrypted serials for ${vaultData[i].equipment}`, "SUCCESS");
-        
-        const decrypted = vaultData[i].serials.map(enc => decrypt3DES(enc)).join('\n');
+        addLog(`Decrypted serials for ${item.equipment}`, "SUCCESS");
+        const decrypted = item.serials.map(enc => decrypt3DES(enc)).join('\n');
         alert(`🔓 Serial(s):\n${decrypted}`);
     } else if (key !== null) {
         addLog(`Invalid Decryption Attempt`, "FAILED");
@@ -217,36 +261,44 @@ function unlockItem(i) {
     }
 }
 
-function borrowItem(i) { 
-    pendingBorrowIndex = i; 
+function borrowItem(id) { 
+    pendingBorrowId = id; 
     document.getElementById('borrow-modal').classList.remove('hidden'); 
 }
 
-function confirmBorrow() {
+async function confirmBorrow() {
     const date = document.getElementById('return-date-field').value;
-    let item = vaultData[pendingBorrowIndex];
+    let item = vaultData.find(i => i._id === pendingBorrowId);
     
     if(date) {
         item.status = 'Borrowed';
         item.borrower = currentStudent.name;
         item.returnDate = date; 
         
-        addLog(`Borrowed by ${currentStudent.name}: ${item.equipment}`, "SUCCESS");
-        
-        saveData(); 
-        closeBorrowModal();
+        try {
+            // PUT update to backend
+            await fetch(`${API_URL}/items/${item._id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item)
+            });
+
+            addLog(`Borrowed by ${currentStudent.name}: ${item.equipment}`, "SUCCESS");
+            updateTable(); 
+            closeBorrowModal();
+        } catch(err) { console.error(err); }
     } else {
         alert("Please select a return date.");
     }
 }
 
-function returnItem(i) { 
-    let returningItem = vaultData[i];
+async function returnItem(id) { 
+    let item = vaultData.find(i => i._id === id);
 
-    if (returningItem.returnDate) {
+    if (item.returnDate) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const returnD = new Date(returningItem.returnDate + "T00:00:00");
+        const returnD = new Date(item.returnDate + "T00:00:00");
         const diffDays = Math.ceil((today - returnD) / (1000 * 60 * 60 * 24));
 
         if (diffDays > 0) {
@@ -255,20 +307,42 @@ function returnItem(i) {
         }
     }
 
-    addLog(`Returned by ${returningItem.borrower}: ${returningItem.equipment}`, "SUCCESS");
+    addLog(`Returned by ${item.borrower}: ${item.equipment}`, "SUCCESS");
 
-    returningItem.status = 'Available'; 
-    returningItem.borrower = ''; 
-    delete returningItem.returnDate; 
+    item.status = 'Available'; 
+    item.borrower = ''; 
+    item.returnDate = ''; 
     
-    saveData(); 
+    try {
+        await fetch(`${API_URL}/items/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+        });
+        updateTable(); 
+    } catch(err) { console.error(err); }
 }
 
-function removeItem(i) { if(confirm("Delete item?")) { addLog(`Item Deleted: ${vaultData[i].equipment}`, "DELETED"); vaultData.splice(i, 1); saveData(); } }
-function saveData() { localStorage.setItem('cit_vault_data', JSON.stringify(vaultData)); updateTable(); }
-function filterByStatus(s) { updateTable(s === 'All' ? vaultData : vaultData.filter(i => i.status === s)); }
+async function removeItem(id) { 
+    if(confirm("Delete item?")) { 
+        const item = vaultData.find(i => i._id === id);
+        addLog(`Item Deleted: ${item.equipment}`, "DELETED"); 
+        
+        // DELETE from backend
+        try {
+            await fetch(`${API_URL}/items/${id}`, { method: 'DELETE' });
+            vaultData = vaultData.filter(i => i._id !== id); 
+            updateTable();
+        } catch(err) { console.error(err); }
+    } 
+}
 
-function saveNewPin() { 
+function filterByStatus(s) { 
+    updateTable(s === 'All' ? vaultData : vaultData.filter(i => i.status === s)); 
+}
+
+// --- CONFIG ACTIONS ---
+async function saveNewPin() { 
     const oldPin = document.getElementById('old-pin-field').value;
     const newPin = document.getElementById('new-pin-field').value; 
     
@@ -279,7 +353,14 @@ function saveNewPin() {
 
     if (oldPin === currentPin) { 
         currentPin = newPin; 
-        localStorage.setItem('cit_vault_pin', currentPin); 
+        
+        // Save to Backend
+        await fetch(`${API_URL}/config`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin: currentPin, masterKey: masterKey })
+        });
+
         addLog("PIN Changed", "SUCCESS"); 
         alert("PIN successfully updated!"); 
         closePinModal(); 
@@ -289,7 +370,7 @@ function saveNewPin() {
     }
 }
 
-function saveMasterKey() {
+async function saveMasterKey() {
     const oldKey = document.getElementById('old-master-key-field').value;
     const newKey = document.getElementById('new-master-key-field').value;
     
@@ -300,7 +381,13 @@ function saveMasterKey() {
     
     if (oldKey === masterKey) {
         masterKey = newKey;
-        localStorage.setItem('cit_master_key', masterKey);
+        
+        await fetch(`${API_URL}/config`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin: currentPin, masterKey: masterKey })
+        });
+
         addLog("Master Key Changed", "SUCCESS");
         alert("Master Key successfully updated! Old items still require the old key.");
         closeMasterKeyModal();
@@ -310,6 +397,7 @@ function saveMasterKey() {
     }
 }
 
+// --- UTILS & UI CONTROLS ---
 function lockSystem() { location.reload(); }
 
 function switchTab(role) {
