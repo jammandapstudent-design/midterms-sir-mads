@@ -8,30 +8,28 @@ let auditLogs = [];
 let currentUserRole = null;
 let currentStudent = { name: '', id: '' };
 let pendingBorrowId = null;
+let itemToUnlockId = null;
 
 // --- INITIALIZE FROM BACKEND ---
 async function initApp() {
     try {
-        // 1. Fetch Config (PIN & Master Key)
         const configRes = await fetch(`${API_URL}/config`);
         const config = await configRes.json();
         currentPin = config.pin || "1234";
         masterKey = config.masterKey || "1234";
 
-        // 2. Fetch Inventory Items
         const itemsRes = await fetch(`${API_URL}/items`);
         vaultData = await itemsRes.json();
 
-        // 3. Fetch Audit Logs
         const logsRes = await fetch(`${API_URL}/logs`);
         auditLogs = await logsRes.json();
 
+        if (currentUserRole) setupUI(); // Refresh UI if already logged in
     } catch (error) {
         console.error("⚠️ Make sure your Node backend is running!", error);
     }
 }
 
-// Run this immediately when the page loads
 window.onload = initApp;
 
 // --- 3DES ENGINE ---
@@ -54,11 +52,38 @@ function runFeistel16(block, key) {
     return R + L;
 }
 
-function apply3DES(text) {
+// --- VISUAL 3DES HANDLER ---
+async function apply3DESWithVisuals(text) {
+    const viz = document.getElementById('encryption-visualizer');
+    const steps = [document.getElementById('step-1'), document.getElementById('step-2'), document.getElementById('step-3')];
+    const resultBox = document.getElementById('viz-result');
+    
+    viz.classList.remove('hidden');
+    
+    // Step 1: Encrypt
+    steps[0].classList.add('active');
     let s1 = runFeistel16(text, masterKey);
+    resultBox.innerText = "K1 Applied: " + btoa(s1).substring(0,10) + "...";
+    await new Promise(r => setTimeout(r, 800));
+
+    // Step 2: Decrypt
+    steps[1].classList.add('active');
     let s2 = runFeistel16(s1, masterKey.split('').reverse().join(''));
+    resultBox.innerText = "K2 Inverse Applied: " + btoa(s2).substring(0,10) + "...";
+    await new Promise(r => setTimeout(r, 800));
+
+    // Step 3: Final Encrypt
+    steps[2].classList.add('active');
     let s3 = runFeistel16(s2, masterKey);
-    return "3DES-" + btoa(s3);
+    const finalCipher = "3DES-" + btoa(s3);
+    resultBox.innerText = "Final 3DES Cipher: " + finalCipher;
+    await new Promise(r => setTimeout(r, 1000));
+
+    // Reset Visuals
+    viz.classList.add('hidden');
+    steps.forEach(s => s.classList.remove('active'));
+    
+    return finalCipher;
 }
 
 function decrypt3DES(enc) {
@@ -71,28 +96,10 @@ function decrypt3DES(enc) {
     } catch (e) { return "Error"; }
 }
 
-// --- LOGGING TO DATABASE ---
-function renderAuditLogs() {
-    const logDiv = document.getElementById('audit-list');
-    if (logDiv) {
-        if (auditLogs.length > 0) {
-            logDiv.innerHTML = auditLogs.map(log => {
-                let color = '#ef4444';
-                if (log.status === 'SUCCESS') color = '#10b981';
-                if (log.status === 'DELETED') color = '#dc2626';
-                return `[${log.timestamp}] <span style="color:${color}; font-weight:normal;">${log.status}</span>: ${log.action}`;
-            }).join('<br>');
-        } else {
-            logDiv.innerHTML = '<div style="color: #64748b;"> Initializing Secure Environment </div>';
-        }
-    }
-}
-
+// --- LOGGING ---
 async function addLog(action, status) {
-    const timestamp = new Date().toLocaleString(); 
+    const timestamp = new Date().toLocaleString();
     const newLog = { action, status, timestamp };
-
-    // Send to Backend
     try {
         const res = await fetch(`${API_URL}/logs`, {
             method: 'POST',
@@ -100,11 +107,19 @@ async function addLog(action, status) {
             body: JSON.stringify(newLog)
         });
         const savedLog = await res.json();
-        
-        // Update Frontend
         auditLogs.unshift(savedLog);
         renderAuditLogs();
     } catch(err) { console.error(err); }
+}
+
+function renderAuditLogs() {
+    const logDiv = document.getElementById('audit-list');
+    if (logDiv) {
+        logDiv.innerHTML = auditLogs.map(log => {
+            let color = log.status === 'SUCCESS' ? '#10b981' : (log.status === 'DELETED' ? '#dc2626' : '#ef4444');
+            return `[${log.timestamp}] <span style="color:${color}; font-weight:bold;">${log.status}</span>: ${log.action}`;
+        }).join('<br>');
+    }
 }
 
 // --- ACCESS CONTROL ---
@@ -136,24 +151,27 @@ function checkStudentLogin() {
 function setupUI() {
     document.getElementById('login-container').classList.add('hidden');
     document.getElementById('dashboard').classList.remove('hidden');
-   
+    
     const isAdmin = (currentUserRole === 'admin');
     document.getElementById('admin-controls').classList.toggle('hidden', !isAdmin);
     document.getElementById('audit-log-container').classList.toggle('hidden', !isAdmin);
     document.getElementById('admin-hint').classList.toggle('hidden', !isAdmin);
     document.getElementById('btn-update-pin').classList.toggle('hidden', !isAdmin);
     document.getElementById('btn-update-master').classList.toggle('hidden', !isAdmin);
+    
+    // Manage Filters
+    document.getElementById('btn-filter-pending').classList.toggle('hidden', !isAdmin);
     document.getElementById('btn-filter-borrowed').classList.toggle('hidden', !isAdmin);
-   
-    document.getElementById('user-greeting').innerHTML = isAdmin 
-        ? "Admin Dashboard" 
+    
+    document.getElementById('user-greeting').innerHTML = isAdmin
+        ? "Admin Dashboard"
         : `Student: <span style="color: #10b981;">${currentStudent.name}</span> ID: <span style="color: #10b981;">${currentStudent.id}</span>`;
-        
+    
     if (isAdmin) renderAuditLogs();
     updateTable();
 }
 
-// --- TABLE RENDERING ---
+// --- TABLE & ACTIONS ---
 function updateTable(dataToDisplay = vaultData) {
     const thead = document.querySelector('#vault-table thead');
     const list = document.getElementById('inventory-list');
@@ -166,135 +184,199 @@ function updateTable(dataToDisplay = vaultData) {
     list.innerHTML = "";
     dataToDisplay.forEach((item, index) => {
         let row = `<tr><td>${index+1}</td><td><strong>${item.equipment}</strong></td>`;
-       
+        
+        // Define Badge styling
+        let badgeClass = 'badge-available';
+        if (item.status === 'Borrowed') badgeClass = 'badge-borrowed';
+        if (item.status === 'Pending Approval') badgeClass = 'badge-pending';
+        
         let penaltyText = "";
         if (item.status === 'Borrowed' && item.returnDate) {
             const today = new Date();
             today.setHours(0, 0, 0, 0); 
             const returnD = new Date(item.returnDate + "T00:00:00"); 
             const diffDays = Math.ceil((today - returnD) / (1000 * 60 * 60 * 24));
-
+            
             if (diffDays > 0) {
-                const totalPenalty = diffDays * 50; 
-                penaltyText = `<br><span style="color: #ef4444; font-size: 0.75rem;"> Overdue: ₱${totalPenalty}</span>`;
+                penaltyText = `<br><span style="color: #ef4444; font-size: 0.75rem;"> Overdue!</span>`;
             } else {
                 penaltyText = `<br><small style="color: #64748b;">Due: ${item.returnDate}</small>`;
             }
         }
+        
+        let statusHtml = `<span class="badge ${badgeClass}">${item.status}</span>`;
+        if(item.borrower) statusHtml += `<br><small>By: ${item.borrower}</small>`;
+        if(item.status === 'Borrowed') statusHtml += penaltyText;
 
         if (isAdmin) {
-            let statusBadge = `<span class="badge ${item.status==='Available'?'badge-available':'badge-borrowed'}">${item.status}</span>`;
-            if(item.status === 'Borrowed') {
-                statusBadge += `<br><small>By: ${item.borrower}</small>`;
-                statusBadge += penaltyText; 
-            }
-           
-            let displaySerial = item.serials.length > 1 ? `[${item.serials.length} Serials Hidden]` : item.serials[0];
-
-            // Uses item._id from MongoDB
-            row += `<td style="cursor:pointer; font-family:monospace; color:#64748b;" onclick="unlockItem('${item._id}')">${displaySerial}</td>
-                    <td>${statusBadge}</td>
-                    <td><button onclick="removeItem('${item._id}')" class="btn-delete-row">Delete</button></td>`;
-        } else {
-            let btn = item.status === 'Available' ? `<button onclick="borrowItem('${item._id}')" class="btn-borrow">Borrow</button>` :
-                     (item.borrower === currentStudent.name ? `<button onclick="returnItem('${item._id}')" class="btn-return">Return</button>` : 'Unavailable');
+            let displaySerial = item.serials[0];
             
-            let studentStatusBadge = `<span class="badge ${item.status==='Available'?'badge-available':'badge-borrowed'}">${item.status}</span>`;
-            if(item.status === 'Borrowed') studentStatusBadge += penaltyText;
+            // Render Admin Actions based on Status
+            let actionHtml = '';
+            if (item.status === 'Pending Approval') {
+                actionHtml = `
+                    <button onclick="acceptRequest('${item._id}')" class="btn-action-sm" style="background:#10b981;">Accept</button>
+                    <button onclick="rejectRequest('${item._id}')" class="btn-action-sm" style="background:#ef4444;">Reject</button>
+                `;
+            } else {
+                actionHtml = `<button onclick="removeItem('${item._id}')" class="btn-delete-row">Delete</button>`;
+            }
 
-            row += `<td>${studentStatusBadge}</td>
+            row += `<td style="cursor:pointer; font-family:monospace; color:#3b82f6;" onclick="unlockItem('${item._id}')">${displaySerial}</td>
+                    <td>${statusHtml}</td>
+                    <td>${actionHtml}</td>`;
+        } else {
+            // Render Student Actions based on Status
+            let btn = '';
+            if (item.status === 'Available') {
+                btn = `<button onclick="borrowItem('${item._id}')" class="btn-borrow">Borrow</button>`;
+            } else if (item.status === 'Pending Approval' && item.borrower === currentStudent.name) {
+                btn = `<span style="font-size: 0.8rem; color: #6366f1; font-weight: bold;">Waiting...</span>`;
+            } else if (item.status === 'Borrowed' && item.borrower === currentStudent.name) {
+                btn = `<button onclick="returnItem('${item._id}')" class="btn-return">Return</button>`;
+            } else {
+                btn = `<span style="font-size: 0.8rem; color: #64748b;">Unavailable</span>`;
+            }
+            
+            row += `<td>${statusHtml}</td>
                     <td>${btn}</td>`;
         }
         list.innerHTML += row + "</tr>";
     });
 }
 
-// --- DATABASE ACTIONS ---
+// --- ADD ITEM ---
 async function addNewItem() {
     const n = document.getElementById('item-name').value.trim();
     const s = document.getElementById('item-serial').value.trim();
 
-    if (n && s) {
-        let serialList = s.split(',').map(str => str.trim()).filter(Boolean);
-        const encryptedSerials = serialList.map(serial => apply3DES(serial));
-
-        const newItem = { 
-            equipment: n, 
-            serials: encryptedSerials, 
-            status: 'Available', 
-            borrower: '',
-            returnDate: ''
-        };
-
-        try {
-            // POST to backend
-            const res = await fetch(`${API_URL}/items`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newItem)
-            });
-            const savedItem = await res.json();
-            
-            vaultData.push(savedItem); // Add DB version with _id
-            addLog(`Registered: ${n}`, "SUCCESS");
-            updateTable();
-
-            document.getElementById('item-name').value = ""; 
-            document.getElementById('item-serial').value = "";
-        } catch(err) { console.error(err); alert("Error saving to database."); }
-    } else {
-        alert("Please enter both the item name and serial number.");
+    if (!n || !s) {
+        alert("Action Denied: Item Name and Serial are required.");
+        return;
     }
+
+    const encryptedSerial = await apply3DESWithVisuals(s);
+
+    const newItem = {
+        equipment: n,
+        serials: [encryptedSerial],
+        status: 'Available'
+    };
+
+    try {
+        const res = await fetch(`${API_URL}/items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newItem)
+        });
+        const savedItem = await res.json();
+        vaultData.push(savedItem);
+        addLog(`Registered: ${n} (3DES Protected)`, "SUCCESS");
+        updateTable();
+        document.getElementById('item-name').value = "";
+        document.getElementById('item-serial').value = "";
+    } catch(err) { console.error(err); }
 }
 
+// --- CUSTOM DECRYPTION PROMPT ---
 function unlockItem(id) {
-    const key = prompt("MASTER KEY REQUIRED:");
-    const item = vaultData.find(i => i._id === id);
+    itemToUnlockId = id;
+    document.getElementById('master-key-prompt-modal').classList.remove('hidden');
+}
 
-    if (key === masterKey) {
-        addLog(`Decrypted serials for ${item.equipment}`, "SUCCESS");
-        const decrypted = item.serials.map(enc => decrypt3DES(enc)).join('\n');
-        alert(`🔓 Serial(s):\n${decrypted}`);
-    } else if (key !== null) {
-        addLog(`Invalid Decryption Attempt`, "FAILED");
-        alert("Incorrect Master Key.");
+function closeDecryptModal() {
+    document.getElementById('master-key-prompt-modal').classList.add('hidden');
+    document.getElementById('decryption-key-input').value = "";
+}
+
+function confirmDecryption() {
+    const keyInput = document.getElementById('decryption-key-input').value;
+    const item = vaultData.find(i => i._id === itemToUnlockId);
+
+    if (keyInput === masterKey) {
+        addLog(`Decrypted ${item.equipment}`, "SUCCESS");
+        alert(`🔓 Original Serial: ${decrypt3DES(item.serials[0])}`);
+        closeDecryptModal();
+    } else {
+        addLog("Failed Decryption Attempt", "SECURITY ALERT");
+        alert("ACCESS DENIED: Invalid Master Key.");
     }
 }
 
-function borrowItem(id) { 
-    pendingBorrowId = id; 
-    document.getElementById('borrow-modal').classList.remove('hidden'); 
+// --- ADMIN APPROVAL ACTIONS ---
+async function acceptRequest(id) {
+    let item = vaultData.find(i => i._id === id);
+    item.status = 'Borrowed';
+    
+    try {
+        await fetch(`${API_URL}/items/${item._id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+        });
+        addLog(`Approved request for ${item.equipment} by ${item.borrower}`, "SUCCESS");
+        updateTable();
+    } catch(err) { console.error(err); }
+}
+
+async function rejectRequest(id) {
+    let item = vaultData.find(i => i._id === id);
+    let studentName = item.borrower;
+    
+    item.status = 'Available';
+    item.borrower = '';
+    item.returnDate = '';
+    
+    try {
+        await fetch(`${API_URL}/items/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+        });
+        addLog(`Rejected request for ${item.equipment} by ${studentName}`, "DELETED");
+        updateTable();
+    } catch(err) { console.error(err); }
+}
+
+// --- OTHER ACTIONS ---
+async function removeItem(id) {
+    if(confirm("Delete item?")) {
+        await fetch(`${API_URL}/items/${id}`, { method: 'DELETE' });
+        vaultData = vaultData.filter(i => i._id !== id);
+        updateTable();
+    }
+}
+
+function borrowItem(id) {
+    pendingBorrowId = id;
+    document.getElementById('borrow-modal').classList.remove('hidden');
 }
 
 async function confirmBorrow() {
     const date = document.getElementById('return-date-field').value;
+    if(!date) return alert("Select return date.");
+    
     let item = vaultData.find(i => i._id === pendingBorrowId);
     
-    if(date) {
-        item.status = 'Borrowed';
-        item.borrower = currentStudent.name;
-        item.returnDate = date; 
-        
-        try {
-            // PUT update to backend
-            await fetch(`${API_URL}/items/${item._id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(item)
-            });
+    item.status = 'Pending Approval';
+    item.borrower = currentStudent.name;
+    item.returnDate = date;
 
-            addLog(`Borrowed by ${currentStudent.name}: ${item.equipment}`, "SUCCESS");
-            updateTable(); 
-            closeBorrowModal();
-        } catch(err) { console.error(err); }
-    } else {
-        alert("Please select a return date.");
-    }
+    try {
+        await fetch(`${API_URL}/items/${item._id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+        });
+        addLog(`Requested by ${currentStudent.name}: ${item.equipment}`, "SUCCESS");
+        updateTable();
+        closeBorrowModal();
+    } catch(err) { console.error(err); }
 }
 
-async function returnItem(id) { 
+async function returnItem(id) {
     let item = vaultData.find(i => i._id === id);
-
+    
     if (item.returnDate) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -306,12 +388,12 @@ async function returnItem(id) {
             alert(` OVERDUE ITEM DETECTED!\n\nPlease proceed to the Administrator to pay the penalty fee of ₱${totalPenalty}.`);
         }
     }
-
+    
     addLog(`Returned by ${item.borrower}: ${item.equipment}`, "SUCCESS");
-
-    item.status = 'Available'; 
-    item.borrower = ''; 
-    item.returnDate = ''; 
+    
+    item.status = 'Available';
+    item.borrower = '';
+    item.returnDate = '';
     
     try {
         await fetch(`${API_URL}/items/${id}`, {
@@ -319,53 +401,37 @@ async function returnItem(id) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(item)
         });
-        updateTable(); 
+        updateTable();
     } catch(err) { console.error(err); }
 }
 
-async function removeItem(id) { 
-    if(confirm("Delete item?")) { 
-        const item = vaultData.find(i => i._id === id);
-        addLog(`Item Deleted: ${item.equipment}`, "DELETED"); 
-        
-        // DELETE from backend
-        try {
-            await fetch(`${API_URL}/items/${id}`, { method: 'DELETE' });
-            vaultData = vaultData.filter(i => i._id !== id); 
-            updateTable();
-        } catch(err) { console.error(err); }
-    } 
+function filterByStatus(s) {
+    updateTable(s === 'All' ? vaultData : vaultData.filter(i => i.status === s));
 }
 
-function filterByStatus(s) { 
-    updateTable(s === 'All' ? vaultData : vaultData.filter(i => i.status === s)); 
-}
-
-// --- CONFIG ACTIONS ---
-async function saveNewPin() { 
+// --- CONFIG SETTINGS ---
+async function saveNewPin() {
     const oldPin = document.getElementById('old-pin-field').value;
-    const newPin = document.getElementById('new-pin-field').value; 
+    const newPin = document.getElementById('new-pin-field').value;
     
     if (!oldPin || !newPin) {
         alert("Please fill in both fields.");
         return;
     }
 
-    if (oldPin === currentPin) { 
-        currentPin = newPin; 
-        
-        // Save to Backend
+    if (oldPin === currentPin) {
+        currentPin = newPin;
         await fetch(`${API_URL}/config`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pin: currentPin, masterKey: masterKey })
         });
-
-        addLog("PIN Changed", "SUCCESS"); 
-        alert("PIN successfully updated!"); 
-        closePinModal(); 
+        
+        addLog("Security PIN Changed", "SUCCESS"); 
+        alert("PIN Updated!"); 
+        closePinModal();
     } else {
-        addLog("Failed PIN Update", "FAILED");
+        addLog("Failed PIN Update Attempt", "SECURITY ALERT");
         alert("Incorrect Old PIN.");
     }
 }
@@ -378,52 +444,38 @@ async function saveMasterKey() {
         alert("Please fill in both fields.");
         return;
     }
-    
+
     if (oldKey === masterKey) {
         masterKey = newKey;
-        
         await fetch(`${API_URL}/config`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pin: currentPin, masterKey: masterKey })
         });
-
+        
         addLog("Master Key Changed", "SUCCESS");
-        alert("Master Key successfully updated! Old items still require the old key.");
+        alert("Master Key Updated!"); 
         closeMasterKeyModal();
     } else {
-        addLog("Failed Master Key Update", "FAILED");
+        addLog("Failed Master Key Update Attempt", "SECURITY ALERT");
         alert("Incorrect Old Master Key.");
     }
 }
 
-// --- UTILS & UI CONTROLS ---
+// --- UTILITIES ---
 function lockSystem() { location.reload(); }
-
 function switchTab(role) {
     const isAdmin = (role === 'admin');
     document.getElementById('admin-login-form').classList.toggle('hidden', !isAdmin);
     document.getElementById('student-login-form').classList.toggle('hidden', isAdmin);
     document.getElementById('tab-admin').classList.toggle('active', isAdmin);
     document.getElementById('tab-student').classList.toggle('active', !isAdmin);
-    document.getElementById('pin-input').value = "";
-    document.getElementById('student-name').value = "";
-    document.getElementById('student-id').value = "";
 }
-
 function closeAlert() { document.getElementById('security-alert').classList.add('hidden'); }
 function openPinModal() { document.getElementById('pin-modal').classList.remove('hidden'); }
-function closePinModal() { 
-    document.getElementById('pin-modal').classList.add('hidden'); 
-    document.getElementById('old-pin-field').value = '';
-    document.getElementById('new-pin-field').value = '';
-}
+function closePinModal() { document.getElementById('pin-modal').classList.add('hidden'); }
 function openMasterKeyModal() { document.getElementById('master-key-modal').classList.remove('hidden'); }
-function closeMasterKeyModal() { 
-    document.getElementById('master-key-modal').classList.add('hidden'); 
-    document.getElementById('old-master-key-field').value = '';
-    document.getElementById('new-master-key-field').value = '';
-}
+function closeMasterKeyModal() { document.getElementById('master-key-modal').classList.add('hidden'); }
 function closeBorrowModal() { document.getElementById('borrow-modal').classList.add('hidden'); }
 function handleLoginEnter(e) { if(e.key === 'Enter') checkLogin(); }
 function handleAddItemEnter(e) { if(e.key === 'Enter') addNewItem(); }
