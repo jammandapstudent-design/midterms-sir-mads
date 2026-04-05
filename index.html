@@ -24,7 +24,7 @@
             <div id="admin-login-screen" class="hidden">
                 <h3 style="color: #003366;">Admin Authentication</h3>
                 <p style="font-size: 0.8rem; color: #ef4444;" id="lockout-timer"></p>
-                <input type="password" id="pin-input" placeholder="Enter Secure PIN" onkeydown="handleLoginEnter(event)">
+                <input type="password" id="password-input" placeholder="Enter Admin Password" onkeydown="handleLoginEnter(event)">
                 <button onclick="checkAdminLogin()" class="btn-primary" id="btn-admin-login">Verify Identity</button>
                 <button onclick="returnToLanding()" class="btn-text">← Back</button>
             </div>
@@ -54,10 +54,10 @@
 
     <div id="security-alert" class="overlay hidden">
         <div class="alert-box">
-            <h1>SECURITY ALERT</h1>
+            <h1> SECURITY ALERT</h1>
             <hr>
             <h2>AUTHORIZED PERSONNEL ONLY</h2>
-            <p id="security-alert-message">Access Denied. Incorrect Administrative PIN entered.</p>
+            <p id="security-alert-message">Access Denied. Incorrect Administrative Password entered.</p>
             <button class="btn-danger" onclick="closeAlert()">Acknowledge</button>
         </div>
     </div>
@@ -69,7 +69,7 @@
                 <div id="user-greeting" class="user-greeting"></div>
             </div>
             <div class="header-right">
-                <button id="btn-update-pin" class="btn-update-header hidden" onclick="openPinModal()">Update PIN</button>
+                <button id="btn-update-password" class="btn-update-header hidden" onclick="openPasswordModal()">Update Password</button>
                 <button class="btn-logout" onclick="logoutSession()">Secure Logout</button>
             </div>
         </div>
@@ -111,14 +111,14 @@
         </div>
     </div>
 
-    <div id="pin-modal" class="overlay hidden">
+    <div id="password-modal" class="overlay hidden">
         <div class="alert-box">
-            <h2>Update Security PIN</h2>
-            <input type="password" id="old-pin-field" placeholder="Enter Old PIN">
-            <input type="password" id="new-pin-field" placeholder="Enter New PIN" onkeydown="handleUpdatePinEnter(event)">
+            <h2>Update Admin Password</h2>
+            <input type="password" id="old-password-field" placeholder="Enter Old Password">
+            <input type="password" id="new-password-field" placeholder="Enter New Password" onkeydown="handleUpdatePasswordEnter(event)">
             <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
-                <button class="btn-add" style="margin-top:0;" onclick="saveNewPin()">Save</button>
-                <button class="btn-danger" onclick="closePinModal()">Cancel</button>
+                <button class="btn-add" style="margin-top:0;" onclick="saveNewPassword()">Save</button>
+                <button class="btn-danger" onclick="closePasswordModal()">Cancel</button>
             </div>
         </div>
     </div>

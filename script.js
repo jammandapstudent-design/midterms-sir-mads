@@ -2,7 +2,7 @@ const API_URL = 'http://localhost:5000/api';
 const SYSTEM_KEY = "CIT-SECURE-1234";
 
 // --- SECURITY STATE ---
-let currentPin = "1234";
+let currentPassword = "admin"; // Default password
 let failedLoginAttempts = 0;
 const MAX_ATTEMPTS = 3;
 let lockoutEndTime = null;
@@ -17,7 +17,8 @@ async function initApp() {
     try {
         const configRes = await fetch(`${API_URL}/config`);
         const config = await configRes.json();
-        currentPin = config.pin || "1234";
+        // Backend still sends 'pin', so we store it in 'currentPassword'
+        currentPassword = config.pin || "admin"; 
 
         const itemsRes = await fetch(`${API_URL}/items`);
         vaultData = await itemsRes.json();
@@ -31,7 +32,7 @@ async function initApp() {
             restoreSession(activeRole);
         }
     } catch (error) {
-        console.error(" Make sure your Node backend is running!", error);
+        console.error("⚠️ Make sure your Node backend is running!", error);
     }
 }
 
@@ -68,7 +69,7 @@ function returnToLanding() {
     document.getElementById('admin-login-screen').classList.add('hidden');
     document.getElementById('student-login-screen').classList.add('hidden');
     document.getElementById('portal-selection').classList.remove('hidden');
-    document.getElementById('pin-input').value = "";
+    document.getElementById('password-input').value = "";
 }
 
 function checkAdminLogin() {
@@ -78,17 +79,17 @@ function checkAdminLogin() {
         return;
     }
 
-    const entered = document.getElementById('pin-input').value;
+    const entered = document.getElementById('password-input').value;
     
     // 2. Validate Credentials
-    if (entered === currentPin) {
+    if (entered === currentPassword) {
         failedLoginAttempts = 0; // Reset on success
         sessionStorage.setItem('activeRole', 'admin');
         addLog("Administrator Login Verified", "SUCCESS");
         setupUI('admin');
     } else {
         failedLoginAttempts++;
-        document.getElementById('pin-input').value = "";
+        document.getElementById('password-input').value = "";
         
         // 3. Implement Lockout on Max Attempts
         if (failedLoginAttempts >= MAX_ATTEMPTS) {
@@ -99,7 +100,7 @@ function checkAdminLogin() {
             startLockoutTimer();
         } else {
             addLog(`Failed Admin Entry Attempt (${failedLoginAttempts}/${MAX_ATTEMPTS})`, "SECURITY ALERT");
-            showSecurityAlert(`Incorrect PIN. ${MAX_ATTEMPTS - failedLoginAttempts} attempts remaining.`);
+            showSecurityAlert(`Incorrect Password. ${MAX_ATTEMPTS - failedLoginAttempts} attempts remaining.`);
         }
     }
 }
@@ -146,7 +147,7 @@ function setupUI(role, studentData = null) {
     document.getElementById('admin-controls').classList.toggle('hidden', !isAdmin);
     document.getElementById('audit-log-container').classList.toggle('hidden', !isAdmin);
     document.getElementById('admin-hint').classList.toggle('hidden', !isAdmin);
-    document.getElementById('btn-update-pin').classList.toggle('hidden', !isAdmin);
+    document.getElementById('btn-update-password').classList.toggle('hidden', !isAdmin);
     document.getElementById('btn-filter-pending').classList.toggle('hidden', !isAdmin);
     document.getElementById('btn-filter-borrowed').classList.toggle('hidden', !isAdmin);
     
@@ -406,27 +407,40 @@ async function returnItem(id) {
 
 function filterByStatus(s) { updateTable(s === 'All' ? vaultData : vaultData.filter(i => i.status === s)); }
 
-async function saveNewPin() {
-    const oldPin = document.getElementById('old-pin-field').value;
-    const newPin = document.getElementById('new-pin-field').value;
-    if (!oldPin || !newPin) { alert("Please fill in both fields."); return; }
+// --- CONFIG SETTINGS ---
+async function saveNewPassword() {
+    const oldPass = document.getElementById('old-password-field').value;
+    const newPass = document.getElementById('new-password-field').value;
+    
+    if (!oldPass || !newPass) { 
+        alert("Please fill in both fields."); 
+        return; 
+    }
 
-    if (oldPin === currentPin) {
-        currentPin = newPin;
-        await fetch(`${API_URL}/config`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: currentPin }) });
-        addLog("Security PIN Changed", "SUCCESS"); 
-        alert("PIN Updated!"); closePinModal();
+    if (oldPass === currentPassword) {
+        currentPassword = newPass;
+        
+        // We package the new password as 'pin' so the Node.js backend accepts it!
+        await fetch(`${API_URL}/config`, { 
+            method: 'PUT', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ pin: currentPassword }) 
+        });
+        
+        addLog("Admin Password Changed", "SUCCESS"); 
+        alert("Password Updated!"); 
+        closePasswordModal();
     } else {
-        addLog("Failed PIN Update Attempt", "SECURITY ALERT");
-        alert("Incorrect Old PIN.");
+        addLog("Failed Password Update Attempt", "SECURITY ALERT");
+        alert("Incorrect Old Password.");
     }
 }
 
 // --- MODAL CONTROLS ---
 function closeAlert() { document.getElementById('security-alert').classList.add('hidden'); }
-function openPinModal() { document.getElementById('pin-modal').classList.remove('hidden'); }
-function closePinModal() { document.getElementById('pin-modal').classList.add('hidden'); }
+function openPasswordModal() { document.getElementById('password-modal').classList.remove('hidden'); }
+function closePasswordModal() { document.getElementById('password-modal').classList.add('hidden'); }
 function closeBorrowModal() { document.getElementById('borrow-modal').classList.add('hidden'); }
 function handleLoginEnter(e) { if(e.key === 'Enter') checkAdminLogin(); }
 function handleAddItemEnter(e) { if(e.key === 'Enter') addNewItem(); }
-function handleUpdatePinEnter(e) { if(e.key === 'Enter') { e.preventDefault(); saveNewPin(); } }
+function handleUpdatePasswordEnter(e) { if(e.key === 'Enter') { e.preventDefault(); saveNewPassword(); } }
