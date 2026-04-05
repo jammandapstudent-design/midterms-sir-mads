@@ -8,29 +8,33 @@
 </head>
 <body>
 
-    <div id="login-container" class="wrapper">
+    <div id="landing-container" class="wrapper">
         <div class="card login-card">
             <img src="ua.jpg" alt="University Logo" class="main-logo" onerror="this.style.display='none'">
             <h1>CIT Laboratory</h1>
             <p class="tagline">Triple DES Secure Vault</p>
             <hr>
             
-            <div class="tab-container">
-                <button id="tab-admin" class="tab-btn active" onclick="switchTab('admin')">Admin</button>
-                <button id="tab-student" class="tab-btn" onclick="switchTab('student')">Student</button>
+            <div id="portal-selection">
+                <p style="color: #64748b; margin-bottom: 20px;">Select your access level to continue:</p>
+                <button onclick="showAdminPortal()" class="btn-primary" style="margin-bottom: 15px; padding: 15px; font-size: 1.1rem;">Administrator Portal</button>
+                <button onclick="showStudentPortal()" class="btn-secondary" style="padding: 15px; font-size: 1.1rem; width: 85%;">Student Portal</button>
             </div>
 
-            <div id="admin-login-form" class="login-fields">
-                <label>Administrative Access Required</label>
-                <input type="password" id="pin-input" placeholder="Enter Admin PIN" onkeydown="handleLoginEnter(event)">
-                <button onclick="checkLogin()" class="btn-primary">Access System</button>
+            <div id="admin-login-screen" class="hidden">
+                <h3 style="color: #003366;">Admin Authentication</h3>
+                <p style="font-size: 0.8rem; color: #ef4444;" id="lockout-timer"></p>
+                <input type="password" id="pin-input" placeholder="Enter Secure PIN" onkeydown="handleLoginEnter(event)">
+                <button onclick="checkAdminLogin()" class="btn-primary" id="btn-admin-login">Verify Identity</button>
+                <button onclick="returnToLanding()" class="btn-text">← Back</button>
             </div>
 
-            <div id="student-login-form" class="login-fields hidden">
-                <label>Student Authentication</label>
+            <div id="student-login-screen" class="hidden">
+                <h3 style="color: #003366;">Student Authentication</h3>
                 <input type="text" id="student-name" placeholder="Full Name">
                 <input type="text" id="student-id" placeholder="Student ID" onkeydown="if(event.key === 'Enter') checkStudentLogin()">
-                <button onclick="checkStudentLogin()" class="btn-primary">Student Login</button>
+                <button onclick="checkStudentLogin()" class="btn-primary">Access Vault</button>
+                <button onclick="returnToLanding()" class="btn-text">← Back</button>
             </div>
         </div>
     </div>
@@ -48,25 +52,13 @@
         </div>
     </div>
 
-    <div id="master-key-prompt-modal" class="overlay hidden">
-        <div class="alert-box">
-            <h2 style="color: #003366;">Security Authentication</h2>
-            <p>Enter Master Key to decrypt this serial number.</p>
-            <input type="password" id="decryption-key-input" placeholder="Enter Master Key">
-            <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
-                <button class="btn-add" style="margin:0;" onclick="confirmDecryption()">Unlock</button>
-                <button class="btn-danger" style="margin:0;" onclick="closeDecryptModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
     <div id="security-alert" class="overlay hidden">
         <div class="alert-box">
-            <h1> SECURITY ALERT</h1>
+            <h1>SECURITY ALERT</h1>
             <hr>
             <h2>AUTHORIZED PERSONNEL ONLY</h2>
-            <p>Access Denied. Incorrect Administrative PIN entered.</p>
-            <button class="btn-danger" onclick="closeAlert()">Try Again</button>
+            <p id="security-alert-message">Access Denied. Incorrect Administrative PIN entered.</p>
+            <button class="btn-danger" onclick="closeAlert()">Acknowledge</button>
         </div>
     </div>
 
@@ -77,9 +69,8 @@
                 <div id="user-greeting" class="user-greeting"></div>
             </div>
             <div class="header-right">
-                <button id="btn-update-master" class="btn-update-header hidden" onclick="openMasterKeyModal()" style="background: #8b5cf6;">Update Master Key</button>
                 <button id="btn-update-pin" class="btn-update-header hidden" onclick="openPinModal()">Update PIN</button>
-                <button class="btn-logout" onclick="lockSystem()">Logout</button>
+                <button class="btn-logout" onclick="logoutSession()">Secure Logout</button>
             </div>
         </div>
 
@@ -112,23 +103,11 @@
                     <button id="btn-filter-borrowed" onclick="filterByStatus('Borrowed')" class="filter-btn borrowed-btn hidden">Borrowed</button>
                 </div>
             </div>
-            <p id="admin-hint" style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px;" class="hidden">Admin click the 3DES value to decrypt with Master Key.</p>
+            <p id="admin-hint" style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px;" class="hidden">Admin click the 3DES value to instantly decrypt the serial.</p>
             <table id="vault-table">
                 <thead></thead>
                 <tbody id="inventory-list"></tbody>
             </table>
-        </div>
-    </div>
-
-    <div id="master-key-modal" class="overlay hidden">
-        <div class="alert-box">
-            <h2>Update Master Key</h2>
-            <input type="password" id="old-master-key-field" placeholder="Enter Old Master Key">
-            <input type="password" id="new-master-key-field" placeholder="Enter New Master Key" onkeydown="if(event.key === 'Enter') saveMasterKey()">
-            <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
-                <button class="btn-add" style="margin-top:0;" onclick="saveMasterKey()">Save</button>
-                <button class="btn-danger" onclick="closeMasterKeyModal()">Cancel</button>
-            </div>
         </div>
     </div>
 
@@ -149,7 +128,6 @@
             <h2 style="color: #3b82f6;">Borrow Request</h2>
             <p style="margin-bottom: 5px; font-weight: bold;">When will you return this?</p>
             <input type="date" id="return-date-field" onkeydown="if(event.key === 'Enter') confirmBorrow()">
-            
             <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
                 <button class="btn-primary" style="margin: 0; flex: 1; padding: 12px;" onclick="confirmBorrow()">Submit Request</button>
                 <button class="btn-danger" style="margin: 0; flex: 1; padding: 12px;" onclick="closeBorrowModal()">Cancel</button>
