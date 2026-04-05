@@ -31,7 +31,7 @@ async function initApp() {
             restoreSession(activeRole);
         }
     } catch (error) {
-        console.error("⚠️ Make sure your Node backend is running!", error);
+        console.error(" Make sure your Node backend is running!", error);
     }
 }
 
