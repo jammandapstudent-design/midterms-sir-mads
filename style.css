@@ -27,7 +27,7 @@ button:disabled { background: #94a3b8 !important; cursor: not-allowed; }
 .btn-add { background: #10b981; color: white; padding: 12px 30px; margin-top: 15px; }
 .btn-danger { background: #ef4444; color: white; padding: 10px 20px; }
 
-/* NEW: Analytics Dashboard */
+/* Analytics Dashboard */
 .analytics-container { display: flex; gap: 15px; margin-bottom: 20px; }
 .analytic-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; flex: 1; padding: 20px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
 .analytic-title { font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: bold; margin-bottom: 8px; }
@@ -38,7 +38,7 @@ button:disabled { background: #94a3b8 !important; cursor: not-allowed; }
 .table-card { text-align: left; }
 .table-header-flex { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
 
-/* NEW: Search Bar */
+/* Search Bar */
 .search-bar { width: 250px; margin: 0; display: inline-block; padding: 10px 15px; font-size: 0.9rem; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 20px; }
 
 table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -50,7 +50,7 @@ th { color: #003366; text-transform: uppercase; font-size: 0.75rem; background: 
 .badge-available { background: #10b981; }
 .badge-borrowed { background: #f59e0b; }
 .badge-pending { background: #6366f1; }
-.badge-maintenance { background: #64748b; } /* NEW MAINTENANCE BADGE */
+.badge-maintenance { background: #64748b; }
 
 .btn-borrow { background: #3b82f6; color: white; padding: 6px 14px; font-size: 0.8rem; }
 .btn-return { background: #8b5cf6; color: white; padding: 6px 14px; font-size: 0.8rem; }
@@ -68,3 +68,29 @@ th { color: #003366; text-transform: uppercase; font-size: 0.75rem; background: 
 .spinner { width: 40px; height: 40px; border: 4px solid #3b82f6; border-top: 4px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 .overlay { z-index: 2000; }
+
+/* --- SCROLL TO TOP BUTTON --- */
+#scroll-top-btn {
+    display: none;
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 999;
+    font-size: 1.5rem;
+    font-weight: bold;
+    border: none;
+    outline: none;
+    background-color: #3b82f6;
+    color: white;
+    cursor: pointer;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+#scroll-top-btn:hover {
+    background-color: #10b981;
+    transform: translateY(-3px);
+}

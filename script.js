@@ -496,3 +496,22 @@ function closeBorrowModal() { document.getElementById('borrow-modal').classList.
 function handleLoginEnter(e) { if(e.key === 'Enter') checkAdminLogin(); }
 function handleAddItemEnter(e) { if(e.key === 'Enter') addNewItem(); }
 function handleUpdatePasswordEnter(e) { if(e.key === 'Enter') { e.preventDefault(); saveNewPassword(); } }
+
+// --- SCROLL TO TOP UTILITY ---
+window.onscroll = function() { toggleScrollButton() };
+
+function toggleScrollButton() {
+    const btn = document.getElementById("scroll-top-btn");
+    if (document.body.scrollTop > 200 || document.documentElement.scrollTop > 200) {
+        btn.style.display = "block";
+    } else {
+        btn.style.display = "none";
+    }
+}
+
+function scrollToTop() {
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth' 
+    });
+}
