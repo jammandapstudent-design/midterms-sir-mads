@@ -2,7 +2,7 @@ const API_URL = 'http://localhost:5000/api';
 const SYSTEM_KEY = "CIT-SECURE-1234";
 
 // --- SECURITY STATE ---
-let currentPassword = "admin"; // Default password
+let currentPassword = "admin"; 
 let failedLoginAttempts = 0;
 const MAX_ATTEMPTS = 3;
 let lockoutEndTime = null;
@@ -12,12 +12,15 @@ let vaultData = [];
 let auditLogs = [];
 let pendingBorrowId = null;
 
-// --- INITIALIZATION & SESSION CONTROL ---
+// --- SEARCH & FILTER STATE ---
+let currentFilter = "All";
+let searchQuery = "";
+
+// --- INITIALIZATION ---
 async function initApp() {
     try {
         const configRes = await fetch(`${API_URL}/config`);
         const config = await configRes.json();
-        // Backend still sends 'pin', so we store it in 'currentPassword'
         currentPassword = config.pin || "admin"; 
 
         const itemsRes = await fetch(`${API_URL}/items`);
@@ -26,7 +29,6 @@ async function initApp() {
         const logsRes = await fetch(`${API_URL}/logs`);
         auditLogs = await logsRes.json();
 
-        // Check if an active, verified session exists in the browser
         const activeRole = sessionStorage.getItem('activeRole');
         if (activeRole) {
             restoreSession(activeRole);
@@ -49,9 +51,9 @@ function restoreSession(role) {
 }
 
 function logoutSession() {
-    sessionStorage.clear(); // Destroy the secure session token
+    sessionStorage.clear(); 
     addLog("User Logged Out", "SUCCESS");
-    location.reload(); // Refresh to wipe the dashboard state securely
+    location.reload(); 
 }
 
 // --- SECURE LOGIN FLOW ---
@@ -73,28 +75,23 @@ function returnToLanding() {
 }
 
 function checkAdminLogin() {
-    // 1. Check Brute-Force Lockout Status
     if (lockoutEndTime && Date.now() < lockoutEndTime) {
         showSecurityAlert(`SYSTEM LOCKED. Try again in ${Math.ceil((lockoutEndTime - Date.now()) / 1000)} seconds.`);
         return;
     }
 
     const entered = document.getElementById('password-input').value;
-    
-    // 2. Validate Credentials
     if (entered === currentPassword) {
-        failedLoginAttempts = 0; // Reset on success
+        failedLoginAttempts = 0;
         sessionStorage.setItem('activeRole', 'admin');
         addLog("Administrator Login Verified", "SUCCESS");
         setupUI('admin');
     } else {
         failedLoginAttempts++;
         document.getElementById('password-input').value = "";
-        
-        // 3. Implement Lockout on Max Attempts
         if (failedLoginAttempts >= MAX_ATTEMPTS) {
-            lockoutEndTime = Date.now() + 30000; // 30-second lockout
-            failedLoginAttempts = 0; // Reset counter for after lockout
+            lockoutEndTime = Date.now() + 30000; 
+            failedLoginAttempts = 0; 
             addLog("BRUTE FORCE DETECTED: Admin Lockout Triggered", "SECURITY ALERT");
             showSecurityAlert("MAXIMUM ATTEMPTS EXCEEDED. SYSTEM LOCKED FOR 30 SECONDS.");
             startLockoutTimer();
@@ -132,9 +129,7 @@ function checkStudentLogin() {
         sessionStorage.setItem('studentId', sid);
         addLog(`Student Login: ${n} (ID: ${sid})`, "SUCCESS");
         setupUI('student', { name: n, id: sid });
-    } else {
-        alert("Please enter both Name and Student ID.");
-    }
+    } else { alert("Please enter both Name and Student ID."); }
 }
 
 // --- UI DASHBOARD SETUP ---
@@ -146,17 +141,20 @@ function setupUI(role, studentData = null) {
     
     document.getElementById('admin-controls').classList.toggle('hidden', !isAdmin);
     document.getElementById('audit-log-container').classList.toggle('hidden', !isAdmin);
+    document.getElementById('admin-analytics').classList.toggle('hidden', !isAdmin);
     document.getElementById('admin-hint').classList.toggle('hidden', !isAdmin);
     document.getElementById('btn-update-password').classList.toggle('hidden', !isAdmin);
+    
     document.getElementById('btn-filter-pending').classList.toggle('hidden', !isAdmin);
     document.getElementById('btn-filter-borrowed').classList.toggle('hidden', !isAdmin);
+    document.getElementById('btn-filter-maintenance').classList.toggle('hidden', !isAdmin);
     
     document.getElementById('user-greeting').innerHTML = isAdmin
         ? "Admin Access Verified"
         : `Student: <span style="color: #10b981;">${studentData.name}</span>`;
     
     if (isAdmin) renderAuditLogs();
-    updateTable(vaultData, role, studentData);
+    applyFilters(); 
 }
 
 function showSecurityAlert(msg) {
@@ -191,18 +189,18 @@ async function apply3DESWithVisuals(text) {
     steps[0].classList.add('active');
     let s1 = runFeistel16(text, SYSTEM_KEY);
     resultBox.innerText = "K1 Applied: " + btoa(s1).substring(0,10) + "...";
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 600));
 
     steps[1].classList.add('active');
     let s2 = runFeistel16(s1, SYSTEM_KEY.split('').reverse().join(''));
     resultBox.innerText = "K2 Inverse Applied: " + btoa(s2).substring(0,10) + "...";
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 600));
 
     steps[2].classList.add('active');
     let s3 = runFeistel16(s2, SYSTEM_KEY);
     const finalCipher = "3DES-" + btoa(s3);
     resultBox.innerText = "Final 3DES Cipher: " + finalCipher;
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 800));
 
     viz.classList.add('hidden');
     steps.forEach(s => s.classList.remove('active'));
@@ -245,8 +243,48 @@ function renderAuditLogs() {
     }
 }
 
+// --- SEARCH & ANALYTICS ---
+function handleSearch() {
+    searchQuery = document.getElementById('search-input').value.toLowerCase();
+    applyFilters();
+}
+
+function filterByStatus(s) {
+    currentFilter = s;
+    applyFilters();
+}
+
+function applyFilters() {
+    if(sessionStorage.getItem('activeRole') === 'admin') updateAnalytics();
+
+    let filteredData = vaultData.filter(item => {
+        let matchesStatus = currentFilter === 'All' ? true : item.status === currentFilter;
+        let matchesSearch = item.equipment.toLowerCase().includes(searchQuery);
+        return matchesStatus && matchesSearch;
+    });
+
+    updateTable(filteredData);
+}
+
+function updateAnalytics() {
+    document.getElementById('stat-total').innerText = vaultData.length;
+    document.getElementById('stat-borrowed').innerText = vaultData.filter(i => i.status === 'Borrowed').length;
+    document.getElementById('stat-pending').innerText = vaultData.filter(i => i.status === 'Pending Approval').length;
+
+    let totalPenalties = 0;
+    vaultData.forEach(item => {
+        if (item.status === 'Borrowed' && item.returnDate) {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const returnD = new Date(item.returnDate + "T00:00:00");
+            const diffDays = Math.ceil((today - returnD) / (1000*60*60*24));
+            if(diffDays > 0) totalPenalties += (diffDays * 50);
+        }
+    });
+    document.getElementById('stat-penalties').innerText = `₱${totalPenalties}`;
+}
+
 // --- TABLE RENDERING ---
-function updateTable(dataToDisplay = vaultData, role = sessionStorage.getItem('activeRole'), studentData = {name: sessionStorage.getItem('studentName')}) {
+function updateTable(dataToDisplay, role = sessionStorage.getItem('activeRole'), studentData = {name: sessionStorage.getItem('studentName')}) {
     const thead = document.querySelector('#vault-table thead');
     const list = document.getElementById('inventory-list');
     const isAdmin = (role === 'admin');
@@ -262,16 +300,16 @@ function updateTable(dataToDisplay = vaultData, role = sessionStorage.getItem('a
         let badgeClass = 'badge-available';
         if (item.status === 'Borrowed') badgeClass = 'badge-borrowed';
         if (item.status === 'Pending Approval') badgeClass = 'badge-pending';
+        if (item.status === 'Maintenance') badgeClass = 'badge-maintenance';
         
         let penaltyText = "";
         if (item.status === 'Borrowed' && item.returnDate) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0); 
+            const today = new Date(); today.setHours(0, 0, 0, 0); 
             const returnD = new Date(item.returnDate + "T00:00:00"); 
             const diffDays = Math.ceil((today - returnD) / (1000 * 60 * 60 * 24));
             
             if (diffDays > 0) {
-                penaltyText = `<br><span style="color: #ef4444; font-size: 0.75rem;"> Overdue!</span>`;
+                penaltyText = `<br><span style="color: #ef4444; font-size: 0.75rem;"> Overdue! (₱${diffDays * 50})</span>`;
             } else {
                 penaltyText = `<br><small style="color: #64748b;">Due: ${item.returnDate}</small>`;
             }
@@ -284,12 +322,20 @@ function updateTable(dataToDisplay = vaultData, role = sessionStorage.getItem('a
         if (isAdmin) {
             let displaySerial = item.serials[0];
             let actionHtml = '';
+            
             if (item.status === 'Pending Approval') {
                 actionHtml = `<button onclick="acceptRequest('${item._id}')" class="btn-action-sm" style="background:#10b981;">Accept</button>
                               <button onclick="rejectRequest('${item._id}')" class="btn-action-sm" style="background:#ef4444;">Reject</button>`;
+            } else if (item.status === 'Available') {
+                actionHtml = `<button onclick="toggleMaintenance('${item._id}')" class="btn-action-sm" style="background:#f59e0b; color:white;">Set Maintenance</button>
+                              <button onclick="removeItem('${item._id}')" class="btn-delete-row" style="margin-top:5px;">Delete</button>`;
+            } else if (item.status === 'Maintenance') {
+                actionHtml = `<button onclick="toggleMaintenance('${item._id}')" class="btn-action-sm" style="background:#10b981;">Make Available</button>
+                              <button onclick="removeItem('${item._id}')" class="btn-delete-row" style="margin-top:5px;">Delete</button>`;
             } else {
                 actionHtml = `<button onclick="removeItem('${item._id}')" class="btn-delete-row">Delete</button>`;
             }
+            
             row += `<td style="cursor:pointer; font-family:monospace; color:#3b82f6;" onclick="unlockItem('${item._id}')">${displaySerial}</td>
                     <td>${statusHtml}</td><td>${actionHtml}</td>`;
         } else {
@@ -323,9 +369,9 @@ async function addNewItem() {
         const savedItem = await res.json();
         vaultData.push(savedItem);
         addLog(`Registered: ${n} (3DES Protected)`, "SUCCESS");
-        updateTable();
         document.getElementById('item-name').value = "";
         document.getElementById('item-serial').value = "";
+        applyFilters(); 
     } catch(err) { console.error(err); }
 }
 
@@ -342,7 +388,7 @@ async function acceptRequest(id) {
     try {
         await fetch(`${API_URL}/items/${item._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
         addLog(`Approved request for ${item.equipment} by ${item.borrower}`, "SUCCESS");
-        updateTable();
+        applyFilters();
     } catch(err) { console.error(err); }
 }
 
@@ -353,7 +399,7 @@ async function rejectRequest(id) {
     try {
         await fetch(`${API_URL}/items/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
         addLog(`Rejected request for ${item.equipment} by ${studentName}`, "DELETED");
-        updateTable();
+        applyFilters();
     } catch(err) { console.error(err); }
 }
 
@@ -361,8 +407,19 @@ async function removeItem(id) {
     if(confirm("Delete item?")) {
         await fetch(`${API_URL}/items/${id}`, { method: 'DELETE' });
         vaultData = vaultData.filter(i => i._id !== id);
-        updateTable();
+        applyFilters();
     }
+}
+
+async function toggleMaintenance(id) {
+    let item = vaultData.find(i => i._id === id);
+    item.status = item.status === 'Maintenance' ? 'Available' : 'Maintenance';
+    
+    try {
+        await fetch(`${API_URL}/items/${item._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+        addLog(`Status changed to ${item.status}: ${item.equipment}`, "SUCCESS");
+        applyFilters();
+    } catch(err) { console.error(err); }
 }
 
 function borrowItem(id) {
@@ -382,8 +439,8 @@ async function confirmBorrow() {
     try {
         await fetch(`${API_URL}/items/${item._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
         addLog(`Requested by ${sessionStorage.getItem('studentName')}: ${item.equipment}`, "SUCCESS");
-        updateTable();
         closeBorrowModal();
+        applyFilters();
     } catch(err) { console.error(err); }
 }
 
@@ -401,11 +458,9 @@ async function returnItem(id) {
     
     try {
         await fetch(`${API_URL}/items/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
-        updateTable();
+        applyFilters();
     } catch(err) { console.error(err); }
 }
-
-function filterByStatus(s) { updateTable(s === 'All' ? vaultData : vaultData.filter(i => i.status === s)); }
 
 // --- CONFIG SETTINGS ---
 async function saveNewPassword() {
@@ -413,14 +468,11 @@ async function saveNewPassword() {
     const newPass = document.getElementById('new-password-field').value;
     
     if (!oldPass || !newPass) { 
-        alert("Please fill in both fields."); 
-        return; 
+        alert("Please fill in both fields."); return; 
     }
 
     if (oldPass === currentPassword) {
         currentPassword = newPass;
-        
-        // We package the new password as 'pin' so the Node.js backend accepts it!
         await fetch(`${API_URL}/config`, { 
             method: 'PUT', 
             headers: { 'Content-Type': 'application/json' }, 

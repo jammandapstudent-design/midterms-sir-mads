@@ -54,10 +54,10 @@
 
     <div id="security-alert" class="overlay hidden">
         <div class="alert-box">
-            <h1> SECURITY ALERT</h1>
+            <h1>⚠️ SECURITY ALERT</h1>
             <hr>
             <h2>AUTHORIZED PERSONNEL ONLY</h2>
-            <p id="security-alert-message">Access Denied. Incorrect Administrative Password entered.</p>
+            <p id="security-alert-message">Access Denied.</p>
             <button class="btn-danger" onclick="closeAlert()">Acknowledge</button>
         </div>
     </div>
@@ -71,6 +71,25 @@
             <div class="header-right">
                 <button id="btn-update-password" class="btn-update-header hidden" onclick="openPasswordModal()">Update Password</button>
                 <button class="btn-logout" onclick="logoutSession()">Secure Logout</button>
+            </div>
+        </div>
+
+        <div id="admin-analytics" class="analytics-container hidden">
+            <div class="analytic-card">
+                <div class="analytic-title">Total Equipment</div>
+                <div class="analytic-value" id="stat-total">0</div>
+            </div>
+            <div class="analytic-card">
+                <div class="analytic-title">Borrowed</div>
+                <div class="analytic-value" id="stat-borrowed" style="color:#f59e0b;">0</div>
+            </div>
+            <div class="analytic-card">
+                <div class="analytic-title">Pending Approvals</div>
+                <div class="analytic-value" id="stat-pending" style="color:#6366f1;">0</div>
+            </div>
+            <div class="analytic-card">
+                <div class="analytic-title">Overdue Fees</div>
+                <div class="analytic-value" id="stat-penalties" style="color:#ef4444;">₱0</div>
             </div>
         </div>
 
@@ -89,21 +108,29 @@
             <div class="input-row" style="display: flex; gap: 10px; align-items: center;">
                 <input type="text" id="item-name" placeholder="Item Name" style="margin: 0; flex: 2;">
                 <input type="text" id="item-serial" placeholder="Serial Number" onkeydown="handleAddItemEnter(event)" style="margin: 0; flex: 2;">
-                <button onclick="addNewItem()" class="btn-add" style="margin: 0; padding: 12px 15px;">Add</button>
+                <button onclick="addNewItem()" class="btn-add" style="margin: 0; padding: 12px 15px;">Add to Vault</button>
             </div>
         </div>
 
         <div class="card table-card">
             <div class="table-header-flex">
                 <h3 style="margin:0;">Secure Vault (3DES Protected)</h3>
-                <div class="filter-group">
-                    <button onclick="filterByStatus('All')" class="filter-btn">All</button>
-                    <button onclick="filterByStatus('Available')" class="filter-btn available-btn">Available</button>
-                    <button id="btn-filter-pending" onclick="filterByStatus('Pending Approval')" class="filter-btn hidden">Pending</button>
-                    <button id="btn-filter-borrowed" onclick="filterByStatus('Borrowed')" class="filter-btn borrowed-btn hidden">Borrowed</button>
+                
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="text" id="search-input" placeholder=" Search equipment..." onkeyup="handleSearch()" class="search-bar">
                 </div>
             </div>
+
+            <div class="filter-group" style="margin-top: 10px; margin-bottom: 15px;">
+                <button onclick="filterByStatus('All')" class="filter-btn">All</button>
+                <button onclick="filterByStatus('Available')" class="filter-btn available-btn">Available</button>
+                <button id="btn-filter-pending" onclick="filterByStatus('Pending Approval')" class="filter-btn hidden">Pending</button>
+                <button id="btn-filter-borrowed" onclick="filterByStatus('Borrowed')" class="filter-btn borrowed-btn hidden">Borrowed</button>
+                <button id="btn-filter-maintenance" onclick="filterByStatus('Maintenance')" class="filter-btn hidden">Maintenance</button>
+            </div>
+
             <p id="admin-hint" style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px;" class="hidden">Admin click the 3DES value to instantly decrypt the serial.</p>
+            
             <table id="vault-table">
                 <thead></thead>
                 <tbody id="inventory-list"></tbody>

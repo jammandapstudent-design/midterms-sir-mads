@@ -27,20 +27,30 @@ button:disabled { background: #94a3b8 !important; cursor: not-allowed; }
 .btn-add { background: #10b981; color: white; padding: 12px 30px; margin-top: 15px; }
 .btn-danger { background: #ef4444; color: white; padding: 10px 20px; }
 
+/* NEW: Analytics Dashboard */
+.analytics-container { display: flex; gap: 15px; margin-bottom: 20px; }
+.analytic-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; flex: 1; padding: 20px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+.analytic-title { font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: bold; margin-bottom: 8px; }
+.analytic-value { font-size: 1.8rem; color: #003366; font-weight: bold; }
+
 .dashboard-header { background: #003366; color: white; padding: 15px 25px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .user-greeting { font-size: 0.85rem; color: #cbd5e1; margin-top: 5px; }
 .table-card { text-align: left; }
-.table-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.table-header-flex { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+
+/* NEW: Search Bar */
+.search-bar { width: 250px; margin: 0; display: inline-block; padding: 10px 15px; font-size: 0.9rem; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 20px; }
 
 table { width: 100%; border-collapse: collapse; margin-top: 10px; }
 th, td { padding: 15px; border-bottom: 1px solid #f1f5f9; text-align: left; font-size: 0.9rem; }
 th { color: #003366; text-transform: uppercase; font-size: 0.75rem; background: #f8fafc; font-weight: bold; }
 
-.filter-btn { background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; margin-left: 5px; }
+.filter-btn { background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; margin-right: 5px; }
 .badge { padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; color: white; }
 .badge-available { background: #10b981; }
 .badge-borrowed { background: #f59e0b; }
 .badge-pending { background: #6366f1; }
+.badge-maintenance { background: #64748b; } /* NEW MAINTENANCE BADGE */
 
 .btn-borrow { background: #3b82f6; color: white; padding: 6px 14px; font-size: 0.8rem; }
 .btn-return { background: #8b5cf6; color: white; padding: 6px 14px; font-size: 0.8rem; }
