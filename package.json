@@ -1,26 +1,14 @@
 {
-  "name": "cit_web_project",
+  "name": "cit-secure-vault",
   "version": "1.0.0",
-  "description": "",
-  "main": "script.js",
+  "description": "CIT Laboratory Inventory System",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/jammandapstudent-design/midterms-sir-mads.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/jammandapstudent-design/midterms-sir-mads/issues"
-  },
-  "homepage": "https://github.com/jammandapstudent-design/midterms-sir-mads#readme",
   "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.0",
-    "express": "^5.2.1",
-    "mongoose": "^9.3.3"
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "mongoose": "^7.0.0"
   }
 }

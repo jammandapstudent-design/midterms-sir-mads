@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = '/api';
 const SYSTEM_KEY = "CIT-SECURE-1234";
 
 // --- SECURITY STATE ---
