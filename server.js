@@ -8,15 +8,14 @@ const app = express();
 // --- MIDDLEWARE ---
 app.use(cors());
 app.use(express.json());
-// Serves your CSS, JS, and Images
+// Serves static files if Vercel routing misses them
 app.use(express.static(path.join(__dirname))); 
 
 // --- DATABASE CONNECTION ---
-// Using your provided MongoDB Atlas URI
 const dbURI = 'mongodb+srv://admin:admin@cluster0.gipy0hk.mongodb.net/cit_vault?appName=Cluster0';
 
 mongoose.connect(dbURI)
-    .then(() => console.log('✅ MongoDB Connected Successfully'))
+    .then(() => console.log('✅ MongoDB Connected'))
     .catch(err => console.log('❌ MongoDB Connection Error:', err));
 
 // --- SCHEMAS ---
@@ -62,14 +61,14 @@ app.get('/api/logs', async (req, res) => res.json(await Log.find().sort({ _id: -
 
 app.post('/api/logs', async (req, res) => res.json(await new Log(req.body).save()));
 
-// --- FRONTEND ROUTE (Fixes Vercel 404) ---
+// --- FRONTEND CATCH-ALL ---
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- SERVER START ---
+// --- PORT (For local testing only) ---
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
 
-// CRITICAL FOR VERCEL
+// CRITICAL: Export for Vercel's serverless engine
 module.exports = app;
