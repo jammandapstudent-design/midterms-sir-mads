@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UA | CIT Secure Inventory</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="landing-container" class="wrapper">
+        <div class="card login-card">
+            <img src="ua.jpg" alt="University Logo" class="main-logo" onerror="this.style.display='none'">
+            <h1>CIT Laboratory</h1>
+            <p class="tagline">Triple DES Secure Vault</p>
+            <hr>
+            
+            <div id="portal-selection">
+                <p style="color: #64748b; margin-bottom: 20px;">Select your access level to continue:</p>
+                <button onclick="showAdminPortal()" class="btn-primary" style="margin-bottom: 15px; padding: 15px; font-size: 1.1rem;">Administrator Portal</button>
+                <button onclick="showStudentPortal()" class="btn-secondary" style="padding: 15px; font-size: 1.1rem; width: 85%;">Student Portal</button>
+            </div>
+
+            <div id="admin-login-screen" class="hidden">
+                <h3 style="color: #003366;">Admin Authentication</h3>
+                <p style="font-size: 0.8rem; color: #ef4444;" id="lockout-timer"></p>
+                <input type="password" id="password-input" placeholder="Enter Admin Password" onkeydown="handleLoginEnter(event)">
+                <button onclick="checkAdminLogin()" class="btn-primary" id="btn-admin-login">Verify Identity</button>
+                <button onclick="returnToLanding()" class="btn-text">← Back</button>
+            </div>
+
+            <div id="student-login-screen" class="hidden">
+                <h3 style="color: #003366;">Student Authentication</h3>
+                <input type="text" id="student-name" placeholder="Full Name">
+                <input type="text" id="student-id" placeholder="Student ID" onkeydown="if(event.key === 'Enter') checkStudentLogin()">
+                <button onclick="checkStudentLogin()" class="btn-primary">Access Vault</button>
+                <button onclick="returnToLanding()" class="btn-text">← Back</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="encryption-visualizer" class="overlay hidden">
+        <div class="visual-card">
+            <div class="spinner"></div>
+            <h2 id="viz-title" style="color:#3b82f6;">Applying 3DES Algorithm</h2>
+            <div class="step-list">
+                <p id="step-1" class="viz-step">● Step 1: Encrypt with Key 1 (DES)</p>
+                <p id="step-2" class="viz-step">● Step 2: Decrypt with Key 2 (DES)</p>
+                <p id="step-3" class="viz-step">● Step 3: Encrypt with Key 3 (DES)</p>
+            </div>
+            <div id="viz-result" class="viz-result">Initializing...</div>
+        </div>
+    </div>
+
+    <div id="security-alert" class="overlay hidden">
+        <div class="alert-box">
+            <h1>⚠️ SECURITY ALERT</h1>
+            <hr>
+            <h2>AUTHORIZED PERSONNEL ONLY</h2>
+            <p id="security-alert-message">Access Denied.</p>
+            <button class="btn-danger" onclick="closeAlert()">Acknowledge</button>
+        </div>
+    </div>
+
+    <div id="dashboard" class="wrapper hidden">
+        <div class="dashboard-header">
+            <div class="header-left">
+                <h2>CIT Inventory Dashboard</h2>
+                <div id="user-greeting" class="user-greeting"></div>
+            </div>
+            <div class="header-right">
+                <button id="btn-update-password" class="btn-update-header hidden" onclick="openPasswordModal()">Update Password</button>
+                <button class="btn-logout" onclick="logoutSession()">Secure Logout</button>
+            </div>
+        </div>
+
+        <div id="admin-analytics" class="analytics-container hidden">
+            <div class="analytic-card">
+                <div class="analytic-title">Total Equipment</div>
+                <div class="analytic-value" id="stat-total">0</div>
+            </div>
+            <div class="analytic-card">
+                <div class="analytic-title">Borrowed</div>
+                <div class="analytic-value" id="stat-borrowed" style="color:#f59e0b;">0</div>
+            </div>
+            <div class="analytic-card">
+                <div class="analytic-title">Pending Approvals</div>
+                <div class="analytic-value" id="stat-pending" style="color:#6366f1;">0</div>
+            </div>
+            <div class="analytic-card">
+                <div class="analytic-title">Overdue Fees</div>
+                <div class="analytic-value" id="stat-penalties" style="color:#ef4444;">₱0</div>
+            </div>
+        </div>
+
+        <div id="audit-log-container" class="card hidden" style="text-align: left; border-left: 5px solid #003366;">
+            <h3 style="margin-top: 0; display: flex; justify-content: space-between;">
+                Security Audit Log
+                <span style="font-size: 0.7rem; color: #64748b;">Live Monitoring</span>
+            </h3>
+            <div id="audit-list" style="max-height: 120px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div style="color: #64748b;"> Initializing Secure Environment </div>
+            </div>
+        </div>
+
+        <div id="admin-controls" class="card hidden">
+            <h3>Register New Equipment</h3>
+            <div class="input-row" style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="item-name" placeholder="Item Name" style="margin: 0; flex: 2;">
+                <input type="text" id="item-serial" placeholder="Serial Number" onkeydown="handleAddItemEnter(event)" style="margin: 0; flex: 2;">
+                <button onclick="addNewItem()" class="btn-add" style="margin: 0; padding: 12px 15px;">Add to Vault</button>
+            </div>
+        </div>
+
+        <div class="card table-card">
+            <div class="table-header-flex">
+                <h3 style="margin:0;">Secure Vault (3DES Protected)</h3>
+                
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="text" id="search-input" placeholder="🔍 Search equipment..." onkeyup="handleSearch()" class="search-bar">
+                </div>
+            </div>
+
+            <div class="filter-group" style="margin-top: 10px; margin-bottom: 15px;">
+                <button onclick="filterByStatus('All')" class="filter-btn">All</button>
+                <button onclick="filterByStatus('Available')" class="filter-btn available-btn">Available</button>
+                <button id="btn-filter-pending" onclick="filterByStatus('Pending Approval')" class="filter-btn hidden">Pending</button>
+                <button id="btn-filter-borrowed" onclick="filterByStatus('Borrowed')" class="filter-btn borrowed-btn hidden">Borrowed</button>
+                <button id="btn-filter-maintenance" onclick="filterByStatus('Maintenance')" class="filter-btn hidden">Maintenance</button>
+            </div>
+
+            <p id="admin-hint" style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px;" class="hidden">Admin click the 3DES value to instantly decrypt the serial.</p>
+            
+            <table id="vault-table">
+                <thead></thead>
+                <tbody id="inventory-list"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="password-modal" class="overlay hidden">
+        <div class="alert-box">
+            <h2>Update Admin Password</h2>
+            <input type="password" id="old-password-field" placeholder="Enter Old Password">
+            <input type="password" id="new-password-field" placeholder="Enter New Password" onkeydown="handleUpdatePasswordEnter(event)">
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
+                <button class="btn-add" style="margin-top:0;" onclick="saveNewPassword()">Save</button>
+                <button class="btn-danger" onclick="closePasswordModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="borrow-modal" class="overlay hidden">
+        <div class="alert-box">
+            <h2 style="color: #3b82f6;">Borrow Request</h2>
+            <p style="margin-bottom: 5px; font-weight: bold;">When will you return this?</p>
+            <input type="date" id="return-date-field" onkeydown="if(event.key === 'Enter') confirmBorrow()">
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
+                <button class="btn-primary" style="margin: 0; flex: 1; padding: 12px;" onclick="confirmBorrow()">Submit Request</button>
+                <button class="btn-danger" style="margin: 0; flex: 1; padding: 12px;" onclick="closeBorrowModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <button id="scroll-top-btn" onclick="scrollToTop()" title="Go to top">↑</button>
+
+    <script src="script.js"></script>
+</body>
+</html>
