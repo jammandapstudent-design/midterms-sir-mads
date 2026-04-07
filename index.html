@@ -5,6 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UA | CIT Secure Inventory</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Pulse animation for severely overdue items */
+        @keyframes pulseRed {
+            0% { transform: scale(1); opacity: 1; text-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+            50% { transform: scale(1.02); opacity: 0.8; text-shadow: 0 0 8px rgba(239, 68, 68, 0.6); }
+            100% { transform: scale(1); opacity: 1; text-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .pulse-red {
+            animation: pulseRed 1.2s infinite;
+            display: inline-block;
+        }
+        
+        /* Flashing Background for Overdue Rows */
+        @keyframes flashRow {
+            0% { background-color: transparent; }
+            50% { background-color: rgba(239, 68, 68, 0.08); }
+            100% { background-color: transparent; }
+        }
+        .row-overdue {
+            animation: flashRow 2s infinite;
+        }
+    </style>
 </head>
 <body>
 
@@ -16,154 +40,382 @@
             <hr>
             
             <div id="portal-selection">
-                <p style="color: #64748b; margin-bottom: 20px;">Select your access level to continue:</p>
-                <button onclick="showAdminPortal()" class="btn-primary" style="margin-bottom: 15px; padding: 15px; font-size: 1.1rem;">Administrator Portal</button>
-                <button onclick="showStudentPortal()" class="btn-secondary" style="padding: 15px; font-size: 1.1rem; width: 85%;">Student Portal</button>
+                <p class="instruction-text" style="color: #64748b; margin-bottom: 20px;">Select your access level to continue:</p>
+                <button onclick="showAdminPortal()" class="btn-primary login-btn">Administrator Portal</button>
+                <button onclick="showStudentPortal()" class="btn-secondary login-btn">Student Portal</button>
             </div>
 
             <div id="admin-login-screen" class="hidden">
-                <h3 style="color: #003366;">Admin Authentication</h3>
-                <p style="font-size: 0.8rem; color: #ef4444;" id="lockout-timer"></p>
+                <h3 class="auth-title" style="color: #003366;">Admin Authentication</h3>
+                <p id="lockout-timer" class="error-text" style="color: #ef4444; font-size: 0.8rem;"></p>
                 <input type="password" id="password-input" placeholder="Enter Admin Password" onkeydown="handleLoginEnter(event)">
-                <button onclick="checkAdminLogin()" class="btn-primary" id="btn-admin-login">Verify Identity</button>
+                <button onclick="checkAdminLogin()" class="btn-primary login-btn" id="btn-admin-login">Verify Identity</button>
                 <button onclick="returnToLanding()" class="btn-text">← Back</button>
             </div>
 
             <div id="student-login-screen" class="hidden">
-                <h3 style="color: #003366;">Student Authentication</h3>
+                <h3 class="auth-title" style="color: #003366;">Student Authentication</h3>
                 <input type="text" id="student-name" placeholder="Full Name">
                 <input type="text" id="student-id" placeholder="Student ID" onkeydown="if(event.key === 'Enter') checkStudentLogin()">
-                <button onclick="checkStudentLogin()" class="btn-primary">Access Vault</button>
+                <button onclick="checkStudentLogin()" class="btn-primary login-btn">Access Vault</button>
                 <button onclick="returnToLanding()" class="btn-text">← Back</button>
             </div>
         </div>
     </div>
 
-    <div id="encryption-visualizer" class="overlay hidden">
-        <div class="visual-card">
-            <div class="spinner"></div>
-            <h2 id="viz-title" style="color:#3b82f6;">Applying 3DES Algorithm</h2>
-            <div class="step-list">
-                <p id="step-1" class="viz-step">● Step 1: Encrypt with Key 1 (DES)</p>
-                <p id="step-2" class="viz-step">● Step 2: Decrypt with Key 2 (DES)</p>
-                <p id="step-3" class="viz-step">● Step 3: Encrypt with Key 3 (DES)</p>
+    <div id="dashboard" class="dashboard-layout hidden">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo-icon">UA</div>
+                <h2>CIT.Vault</h2>
             </div>
-            <div id="viz-result" class="viz-result">Initializing...</div>
-        </div>
-    </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" id="nav-home" onclick="switchNav('home')"><span>⌂</span> Home</a>
+                <a href="#" class="nav-item admin-only hidden" id="nav-requests" onclick="switchNav('requests')"><span>📥</span> Requests</a>
+                <a href="#" class="nav-item" id="nav-maintenance" onclick="switchNav('maintenance')"><span>🔧</span> Maintenance</a>
+                <a href="#" class="nav-item" id="nav-charts" onclick="switchNav('charts')"><span>📊</span> Charts</a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="btn-update-password" class="btn-sidebar admin-only hidden" onclick="openPasswordModal()">⚙️ Settings</button>
+                <button class="btn-logout" onclick="logoutSession()">Log out</button>
+            </div>
+        </aside>
 
-    <div id="security-alert" class="overlay hidden">
-        <div class="alert-box">
-            <h1>SECURITY ALERT</h1>
-            <hr>
-            <h2>AUTHORIZED PERSONNEL ONLY</h2>
-            <p id="security-alert-message">Access Denied.</p>
-            <button class="btn-danger" onclick="closeAlert()">Acknowledge</button>
-        </div>
-    </div>
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="search-wrapper">
+                    <input type="text" id="search-input" placeholder="Search equipment..." onkeyup="handleSearch()">
+                </div>
+                <div class="user-pill">
+                    <button id="btn-cart" class="student-only hidden" onclick="openCartModal()" style="margin-right:15px; background:var(--cit-blue); color:white; border:none; padding:8px 15px; border-radius:20px; cursor:pointer; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        🛒 Bag (<span id="cart-count">0</span>)
+                    </button>
+                    <div id="user-greeting"></div>
+                </div>
+            </header>
 
-    <div id="dashboard" class="wrapper hidden">
-        <div class="dashboard-header">
-            <div class="header-left">
-                <h2>CIT Inventory Dashboard</h2>
-                <div id="user-greeting" class="user-greeting"></div>
-            </div>
-            <div class="header-right">
-                <button id="btn-update-password" class="btn-update-header hidden" onclick="openPasswordModal()">Update Password</button>
-                <button class="btn-logout" onclick="logoutSession()">Secure Logout</button>
-            </div>
-        </div>
-
-        <div id="admin-analytics" class="analytics-container hidden">
-            <div class="analytic-card">
-                <div class="analytic-title">Total Equipment</div>
-                <div class="analytic-value" id="stat-total">0</div>
-            </div>
-            <div class="analytic-card">
-                <div class="analytic-title">Borrowed</div>
-                <div class="analytic-value" id="stat-borrowed" style="color:#f59e0b;">0</div>
-            </div>
-            <div class="analytic-card">
-                <div class="analytic-title">Pending Approvals</div>
-                <div class="analytic-value" id="stat-pending" style="color:#6366f1;">0</div>
-            </div>
-            <div class="analytic-card">
-                <div class="analytic-title">Overdue Fees</div>
-                <div class="analytic-value" id="stat-penalties" style="color:#ef4444;">₱0</div>
-            </div>
-        </div>
-
-        <div id="audit-log-container" class="card hidden" style="text-align: left; border-left: 5px solid #003366;">
-            <h3 style="margin-top: 0; display: flex; justify-content: space-between;">
-                Security Audit Log
-                <span style="font-size: 0.7rem; color: #64748b;">Live Monitoring</span>
-            </h3>
-            <div id="audit-list" style="max-height: 120px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
-                <div style="color: #64748b;"> Initializing Secure Environment </div>
-            </div>
-        </div>
-
-        <div id="admin-controls" class="card hidden">
-            <h3>Register New Equipment</h3>
-            <div class="input-row" style="display: flex; gap: 10px; align-items: center;">
-                <input type="text" id="item-name" placeholder="Item Name" style="margin: 0; flex: 2;">
-                <input type="text" id="item-serial" placeholder="Serial Number" onkeydown="handleAddItemEnter(event)" style="margin: 0; flex: 2;">
-                <button onclick="addNewItem()" class="btn-add" style="margin: 0; padding: 12px 15px;">Add to Vault</button>
-            </div>
-        </div>
-
-        <div class="card table-card">
-            <div class="table-header-flex">
-                <h3 style="margin:0;">Secure Vault (3DES Protected)</h3>
+            <div class="scroll-content">
                 
-                <div style="display:flex; gap:10px; align-items:center;">
-                    <input type="text" id="search-input" placeholder=" Search equipment..." onkeyup="handleSearch()" class="search-bar">
+                <div id="view-home">
+                    
+                    <div id="admin-analytics" class="admin-only hidden">
+                        <h2 class="page-header" style="margin-bottom: 10px;">Vault Overview</h2>
+                        <div class="metrics-grid" style="margin-bottom: 15px;">
+                            <div class="metric-card">
+                                <div class="metric-value" id="stat-total">0</div>
+                                <div class="metric-label">TOTAL EQUIPMENT</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="stat-borrowed" style="color:#3b82f6;">0</div>
+                                <div class="metric-label">BORROWED</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="stat-pending" style="color:#6366f1;">0</div>
+                                <div class="metric-label">PENDING</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="stat-penalties" style="color:#ef4444;">₱0</div>
+                                <div class="metric-label">TOTAL OVERDUE FEES</div>
+                            </div>
+                        </div>
+                        
+                        <h2 class="page-header" style="margin-bottom: 10px; font-size: 1rem; color: #64748b;">⏳ Deadline Watch</h2>
+                        <div class="metrics-grid">
+                            <div class="metric-card" style="border-left: 4px solid #10b981;">
+                                <div class="metric-value" id="stat-due-today" style="color:#10b981;">0</div>
+                                <div class="metric-label">DUE TODAY</div>
+                            </div>
+                            <div class="metric-card" style="border-left: 4px solid #f59e0b;">
+                                <div class="metric-value" id="stat-due-tomorrow" style="color:#f59e0b;">0</div>
+                                <div class="metric-label">DUE TOMORROW</div>
+                            </div>
+                            <div class="metric-card" style="border-left: 4px solid #ef4444; background: #fef2f2;">
+                                <div class="metric-value" id="stat-overdue" style="color:#ef4444;">0</div>
+                                <div class="metric-label" style="color:#dc2626;">ITEMS OVERDUE</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="student-analytics" class="student-only hidden" style="margin-bottom: 25px;">
+                        <h2 class="page-header" style="margin-bottom: 10px;">My Borrowing Stats</h2>
+                        <div class="metrics-grid">
+                            <div class="metric-card" style="border-left: 4px solid #3b82f6;">
+                                <div class="metric-value" id="student-stat-borrowed" style="color:#3b82f6;">0</div>
+                                <div class="metric-label">CURRENTLY BORROWING</div>
+                            </div>
+                            <div class="metric-card" style="border-left: 4px solid #ef4444;">
+                                <div class="metric-value pulse-red" id="student-stat-overdue" style="color:#ef4444;">0</div>
+                                <div class="metric-label">OVERDUE ITEMS</div>
+                            </div>
+                            <div class="metric-card" style="border-left: 4px solid #f59e0b;">
+                                <div class="metric-value" id="student-stat-penalties" style="color:#f59e0b;">₱0</div>
+                                <div class="metric-label">MY LATE PENALTIES</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="admin-controls" class="card admin-only hidden" style="margin-top: 25px;">
+                        <h2 class="card-header" style="margin-bottom: 25px; color: var(--cit-blue);">Add product</h2>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Name*</label>
+                                <input type="text" id="item-name" placeholder="Equipment Name">
+                            </div>
+                            <div class="form-group">
+                                <label>Item code (Serial)*</label>
+                                <input type="text" id="item-serial" placeholder="Serial Number">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Description*</label>
+                                <input type="text" id="item-description" placeholder="Product Description">
+                            </div>
+                            <div class="form-group">
+                                <label>Price (₱)*</label>
+                                <input type="number" id="item-price" placeholder="e.g. 1500">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Category*</label>
+                                <select id="item-category" style="width: 100%; padding: 14px 20px; border-radius: 10px; border: 1px solid var(--border); background: #f8fafc; font-family: inherit; font-size: 0.9rem; color: var(--text-main); appearance: auto;">
+                                    <option value="" disabled selected hidden></option>
+                                    <option value="End-User Devices">End-User Devices</option>
+                                    <option value="Infrastructure">Infrastructure</option>
+                                    <option value="Networking">Networking</option>
+                                    <option value="Peripherals">Peripherals</option>
+                                    <option value="AV Equipment">AV Equipment</option>
+                                    <option value="Others">Others</option>
+                                </select>
+                            </div>
+                            <div class="form-group"></div>
+                        </div>
+                        <div class="form-group" style="margin-top: 25px;">
+                             <button onclick="addNewItem()" class="btn-save">Save product</button>
+                        </div>
+                    </div>
+
+                    <div id="vault-section" class="card table-card">
+                        <div class="table-tools">
+                            <h2 class="card-header section-title" style="margin: 0; color: var(--cit-blue);">Secure Vault (3DES Protected)</h2>
+                            <div class="filter-pills">
+                                <button onclick="filterByStatus('All')" class="pill active">All</button>
+                                <button onclick="filterByStatus('Available')" class="pill">Available</button>
+                                <button id="btn-filter-pending" onclick="filterByStatus('Pending Approval')" class="pill admin-only hidden">Pending</button>
+                                <button id="btn-filter-borrowed" onclick="filterByStatus('Borrowed')" class="pill admin-only hidden">Borrowed</button>
+                            </div>
+                        </div>
+                        <p id="admin-hint" style="font-size: 0.75rem; color: #64748b; margin-bottom: 15px;" class="admin-only hidden">Admin click the 3DES value to instantly decrypt the serial.</p>
+                        
+                        <div class="table-responsive">
+                            <table id="vault-table" style="width: 100%; border-collapse: collapse;">
+                                <thead></thead>
+                                <tbody id="inventory-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="student-history-section" class="card table-card student-only hidden" style="margin-top: 25px;">
+                        <h2 class="card-header" style="margin-bottom: 15px; color: var(--cit-blue);">My Transaction History <span style="font-size: 0.7rem; color: #64748b; background: #e2e8f0; padding: 4px 10px; border-radius: 12px; font-weight: normal; margin-left: 10px;">Digital Receipt</span></h2>
+                        <div class="table-responsive">
+                            <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="border-bottom: 2px solid var(--border); color: var(--text-muted); font-size: 0.85rem;">
+                                        <th style="padding: 12px 15px;">Date & Time</th>
+                                        <th style="padding: 12px 15px;">Transaction Details</th>
+                                        <th style="padding: 12px 15px;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="student-history-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="audit-log-container" class="card admin-only hidden" style="border-left: 5px solid #003366;">
+                        <h2 class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                            Security Audit Log
+                            <span style="font-size: 0.7rem; color: #10b981; background: #d1fae5; padding: 4px 10px; border-radius: 12px; font-weight: bold;">Live Monitoring</span>
+                        </h2>
+                        <div id="audit-list" class="log-viewer">
+                            <div style="color: #64748b;"> Initializing Secure Environment </div>
+                        </div>
+                    </div>
+                </div> 
+
+                <div id="view-requests" class="hidden">
+                    <div class="card table-card">
+                        <h2 class="card-header section-title" style="margin: 0; color: var(--cit-blue); margin-bottom: 20px;">Pending Borrow Transactions</h2>
+                        <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 20px;">Review and manage student cart checkouts.</p>
+                        <div id="requests-container" style="display: flex; flex-direction: column; gap: 20px;"></div>
+                    </div>
+                </div>
+
+                <div id="view-maintenance" class="hidden">
+                    <div class="metrics-grid admin-only hidden" style="margin-bottom: 20px;">
+                        <div class="metric-card">
+                            <div class="metric-value" id="stat-maint-total">0</div>
+                            <div class="metric-label">ITEMS UNDER REPAIR</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="stat-maint-cost" style="color:#ef4444;">₱0</div>
+                            <div class="metric-label">TOTAL REPAIR COST</div>
+                        </div>
+                    </div>
+
+                    <div class="card table-card">
+                        <div class="table-tools">
+                            <h2 class="card-header section-title" style="margin: 0; color: var(--cit-blue);">Maintenance & Repair Tracker 🔧</h2>
+                        </div>
+                        <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 20px;">Track items that are broken, damaged, or currently out for repair.</p>
+                        
+                        <div class="table-responsive">
+                            <table id="maintenance-table" style="width: 100%; text-align: left; border-collapse: collapse;">
+                                <thead></thead>
+                                <tbody id="maintenance-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-charts" class="hidden">
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <div class="card table-card" style="flex: 1; min-width: 350px;">
+                            <h2 class="card-header section-title" style="margin: 0; color: var(--cit-blue); margin-bottom: 10px;">Category Distribution</h2>
+                            <p style="color: #64748b; font-size: 0.85rem; margin-bottom: 20px;">Current inventory breakdown by category.</p>
+                            <div style="position: relative; height: 300px; width: 100%;">
+                                <canvas id="categoryChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="card table-card" style="flex: 1; min-width: 350px;">
+                            <h2 class="card-header section-title" style="margin: 0; color: var(--cit-blue); margin-bottom: 10px;">Most Borrowed Equipment</h2>
+                            <p style="color: #64748b; font-size: 0.85rem; margin-bottom: 20px;">Top 5 items based on historical borrow frequency.</p>
+                            <div style="position: relative; height: 300px; width: 100%;">
+                                <canvas id="popularChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <div id="encryption-visualizer" class="overlay hidden">
+        <div class="viz-box">
+            <div class="loader"></div>
+            <h2 style="color:#3b82f6;">3DES Encryption Phase</h2>
+            <div id="step-1" class="viz-step">Phase 1: Initializing K1</div>
+            <div id="step-2" class="viz-step">Phase 2: Applying K2 Inverse</div>
+            <div id="step-3" class="viz-step">Phase 3: Finalizing K3</div>
+            <div id="viz-result" class="viz-data">Processing...</div>
+        </div>
+    </div>
+
+    <div id="cart-modal" class="overlay hidden">
+        <div class="modal-card" style="max-width: 600px;">
+            <h2 style="color: #003366; margin-bottom: 15px; display:flex; justify-content:space-between;">
+                <span>🛒 Equipment Bag</span>
+                <span id="cart-total-badge" style="font-size: 0.9rem; background: var(--cit-blue); color: white; padding: 4px 12px; border-radius: 20px;">0 Items</span>
+            </h2>
+            <div class="table-responsive" style="max-height: 250px; overflow-y: auto; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 8px;">
+                <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                    <thead style="background: #f8fafc; position: sticky; top: 0;">
+                        <tr style="border-bottom: 2px solid var(--border); font-size: 0.85rem; color: #64748b;">
+                            <th style="padding: 10px;">Equipment</th>
+                            <th style="padding: 10px; text-align:center;">Qty</th>
+                            <th style="padding: 10px; text-align:center;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cart-list"></tbody>
+                </table>
+            </div>
+            <div class="form-row" style="margin-bottom: 5px;">
+                <div class="form-group" style="flex: 1;">
+                    <label style="font-size: 0.85rem; font-weight: bold;">Expected Return Date*</label>
+                    <input type="date" id="cart-return-date" style="padding: 10px; width: 100%; border-radius: 8px; border: 1px solid var(--border);">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label style="font-size: 0.85rem; font-weight: bold;">Borrow Purpose (Optional)</label>
+                    <input type="text" id="cart-purpose" placeholder="e.g. Thesis Experiment" style="padding: 10px; width: 100%; border-radius: 8px; border: 1px solid var(--border);">
                 </div>
             </div>
-
-            <div class="filter-group" style="margin-top: 10px; margin-bottom: 15px;">
-                <button onclick="filterByStatus('All')" class="filter-btn">All</button>
-                <button onclick="filterByStatus('Available')" class="filter-btn available-btn">Available</button>
-                <button id="btn-filter-pending" onclick="filterByStatus('Pending Approval')" class="filter-btn hidden">Pending</button>
-                <button id="btn-filter-borrowed" onclick="filterByStatus('Borrowed')" class="filter-btn borrowed-btn hidden">Borrowed</button>
-                <button id="btn-filter-maintenance" onclick="filterByStatus('Maintenance')" class="filter-btn hidden">Maintenance</button>
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
+                <button class="btn-primary" style="flex: 2; background: #10b981;" onclick="checkoutCart()">Checkout Items</button>
+                <button class="btn-danger" style="flex: 1; background: #f59e0b;" onclick="clearCart()">Clear Bag</button>
+                <button class="btn-secondary" style="flex: 1; background: #64748b; color: white; border:none;" onclick="closeCartModal()">Cancel</button>
             </div>
-
-            <p id="admin-hint" style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px;" class="hidden">Admin click the 3DES value to instantly decrypt the serial.</p>
-            
-            <table id="vault-table">
-                <thead></thead>
-                <tbody id="inventory-list"></tbody>
-            </table>
         </div>
     </div>
 
     <div id="password-modal" class="overlay hidden">
-        <div class="alert-box">
-            <h2>Update Admin Password</h2>
-            <input type="password" id="old-password-field" placeholder="Enter Old Password">
-            <input type="password" id="new-password-field" placeholder="Enter New Password" onkeydown="handleUpdatePasswordEnter(event)">
+        <div class="modal-card">
+            <h2 style="color: #003366;">Update Password</h2>
+            <input type="password" id="old-password-field" placeholder="Old Password" style="margin-bottom: 15px;">
+            <input type="password" id="new-password-field" placeholder="New Password" onkeydown="handleUpdatePasswordEnter(event)">
             <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
-                <button class="btn-add" style="margin-top:0;" onclick="saveNewPassword()">Save</button>
-                <button class="btn-danger" onclick="closePasswordModal()">Cancel</button>
+                <button class="btn-primary" style="flex: 1;" onclick="saveNewPassword()">Update</button>
+                <button class="btn-danger" style="flex: 1;" onclick="closePasswordModal()">Cancel</button>
             </div>
         </div>
     </div>
 
-    <div id="borrow-modal" class="overlay hidden">
-        <div class="alert-box">
-            <h2 style="color: #3b82f6;">Borrow Request</h2>
-            <p style="margin-bottom: 5px; font-weight: bold;">When will you return this?</p>
-            <input type="date" id="return-date-field" onkeydown="if(event.key === 'Enter') confirmBorrow()">
+    <div id="report-modal" class="overlay hidden">
+        <div class="modal-card">
+            <h2 style="color: #ef4444;">Report Broken Equipment</h2>
+            <p style="margin-bottom: 10px; font-size: 0.9rem; color: #64748b;">Please describe what is wrong with this item.</p>
+            <div id="report-serial-container" class="hidden" style="margin-bottom: 15px;">
+                <label style="font-weight: bold; font-size: 0.85rem;">Select Specific Item (Serial Number):</label>
+                <select id="report-serial-select" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); margin-top: 5px;"></select>
+            </div>
+            <textarea id="report-issue-desc" placeholder="e.g. The screen is cracked and won't turn on..." style="width: 100%; height: 100px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); font-family: inherit; resize: none;"></textarea>
             <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
-                <button class="btn-primary" style="margin: 0; flex: 1; padding: 12px;" onclick="confirmBorrow()">Submit Request</button>
-                <button class="btn-danger" style="margin: 0; flex: 1; padding: 12px;" onclick="closeBorrowModal()">Cancel</button>
+                <button class="btn-primary" style="flex: 1; background: #ef4444;" onclick="submitBrokenReport()">Submit Report</button>
+                <button class="btn-danger" style="flex: 1; background: #64748b;" onclick="closeReportModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-maintenance-modal" class="overlay hidden">
+        <div class="modal-card" style="max-width: 500px;">
+            <h2 style="color: #003366; margin-bottom: 5px;">Update Repair Record</h2>
+            <p id="edit-maint-eq-name" style="color: #64748b; font-weight: bold; margin-bottom: 15px; font-size: 0.9rem;"></p>
+            <div class="form-group" style="margin-bottom: 10px;">
+                <label style="font-size: 0.85rem; font-weight: 600;">Repair Status</label>
+                <select id="maint-status" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                    <option value="Pending">Pending (Awaiting Inspection)</option>
+                    <option value="Diagnosed">Diagnosed (Issue Identified)</option>
+                    <option value="Sent for Repair">Sent for Repair</option>
+                    <option value="Repairing">Repairing</option>
+                    <option value="Fixed">Fixed (Ready to Return to Vault)</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <div class="form-group" style="flex: 1;">
+                    <label style="font-size: 0.85rem; font-weight: 600;">Sent To (Technician)</label>
+                    <input type="text" id="maint-sent-to" placeholder="e.g. IT Department" style="padding: 10px;">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label style="font-size: 0.85rem; font-weight: 600;">Repair Cost (₱)</label>
+                    <input type="number" id="maint-cost" placeholder="e.g. 500" style="padding: 10px;">
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 10px;">
+                <label style="font-size: 0.85rem; font-weight: 600;">Estimated Return Date</label>
+                <input type="date" id="maint-return-date" style="padding: 10px; width: 100%;">
+            </div>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-size: 0.85rem; font-weight: 600;">Maintenance Notes</label>
+                <textarea id="maint-notes" placeholder="Additional details..." style="width: 100%; height: 60px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); font-family: inherit; resize: none;"></textarea>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:center;">
+                <button class="btn-primary" style="flex: 1;" onclick="saveMaintenanceUpdate()">Save Updates</button>
+                <button class="btn-danger" style="flex: 1;" onclick="closeEditMaintModal()">Cancel</button>
             </div>
         </div>
     </div>
 
     <button id="scroll-top-btn" onclick="scrollToTop()" title="Go to top">↑</button>
-
     <script src="script.js"></script>
 </body>
 </html>
