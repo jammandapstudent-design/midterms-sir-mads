@@ -369,7 +369,7 @@ function updateLogsView() {
         alertBanner.style.background = '#fef2f2';
         alertBanner.style.borderLeft = '5px solid #ef4444';
         alertTitle.style.color = '#991b1b';
-        alertTitle.innerHTML = '⚠️ CRITICAL ALERT: High Suspicious Activity Detected';
+        alertTitle.innerHTML = ' CRITICAL ALERT: High Suspicious Activity Detected';
         alertDesc.style.color = '#b91c1c';
         alertDesc.innerHTML = `Multiple failed logins (${failedAttempts}) or critical deletions (${securityFlags}) recorded today. Review immediately.`;
     } else if (failedAttempts > 0 || securityFlags > 0) {

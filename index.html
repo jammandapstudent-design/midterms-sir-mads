@@ -85,7 +85,7 @@
                 <a href="#" class="nav-item admin-only hidden" id="nav-logs" onclick="switchNav('logs')"><span>🛡️</span> Security Logs</a>
             </nav>
             <div class="sidebar-footer">
-                <button id="btn-update-password" class="btn-sidebar admin-only hidden" onclick="openPasswordModal()">⚙️ Settings</button>
+                <button id="btn-update-password" class="btn-sidebar admin-only hidden" onclick="openPasswordModal()"> Update Password</button>
                 <button class="btn-logout" onclick="logoutSession()">Log out</button>
             </div>
         </aside>
@@ -326,7 +326,7 @@
                             <h2 class="card-header section-title" style="margin: 0; color: var(--cit-blue);">Security Audit Log</h2>
                             
                             <div style="display: flex; gap: 10px; width: 100%; flex-wrap: wrap;">
-                                <input type="text" id="log-search" class="log-filter-input" placeholder=" Search User or Action..." onkeyup="updateLogsView()">
+                                <input type="text" id="log-search" class="log-filter-input" placeholder="🔍 Search User or Action..." onkeyup="updateLogsView()">
                                 <input type="date" id="log-date-filter" class="log-filter-input" onchange="updateLogsView()" title="Filter by Date">
                                 <select id="log-type-filter" class="log-filter-input" onchange="updateLogsView()">
                                     <option value="All">All Actions</option>
@@ -411,13 +411,25 @@
     </div>
 
     <div id="password-modal" class="overlay hidden">
-        <div class="modal-card">
-            <h2 style="color: #003366;">Update Password</h2>
-            <input type="password" id="old-password-field" placeholder="Old Password" style="margin-bottom: 15px;">
-            <input type="password" id="new-password-field" placeholder="New Password" onkeydown="handleUpdatePasswordEnter(event)">
-            <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
-                <button class="btn-primary" style="flex: 1;" onclick="saveNewPassword()">Update</button>
-                <button class="btn-danger" style="flex: 1;" onclick="closePasswordModal()">Cancel</button>
+        <div class="modal-card" style="max-width: 400px; text-align: left; padding: 40px 30px;">
+            <div style="text-align: center; margin-bottom: 25px;">
+                <div style="background: #e0e7ff; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px;">
+                    <span style="font-size: 1.5rem;">🔒</span>
+                </div>
+                <h2 style="color: var(--cit-blue); margin: 0; font-size: 1.4rem;">Update Admin Password</h2>
+                <p style="color: #64748b; font-size: 0.85rem; margin-top: 8px;">Ensure your new credentials are secure.</p>
+            </div>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; display: block;">Current Password</label>
+                <input type="password" id="old-password-field" placeholder="Enter current password" style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border); background: #f8fafc; font-family: inherit;">
+            </div>
+            <div class="form-group" style="margin-bottom: 30px;">
+                <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; display: block;">New Password</label>
+                <input type="password" id="new-password-field" placeholder="Enter new password" onkeydown="handleUpdatePasswordEnter(event)" style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border); background: #f8fafc; font-family: inherit;">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-primary" style="flex: 1; padding: 12px; font-size: 0.95rem;" onclick="saveNewPassword()">Save Changes</button>
+                <button class="btn-secondary" style="flex: 1; padding: 12px; font-size: 0.95rem; border: none; background: #f1f5f9; color: #64748b;" onclick="closePasswordModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -479,7 +491,7 @@
 
     <div id="security-alert" class="overlay hidden">
         <div class="modal-card" style="max-width: 400px; border-top: 8px solid #ef4444;">
-            <h2 style="color: #ef4444; margin-bottom: 10px;"> Security Alert</h2>
+            <h2 style="color: #ef4444; margin-bottom: 10px;">⚠️ Security Alert</h2>
             <h3 style="color: #991b1b; margin-top: 0; font-size: 1.1rem;">AUTHORIZED PERSONNEL ONLY</h3>
             <p id="security-alert-message" style="color: #64748b; margin-bottom: 25px; line-height: 1.5; font-weight: 500;"></p>
             <button class="btn-danger" onclick="closeAlert()">Acknowledge</button>
