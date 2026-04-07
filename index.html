@@ -56,7 +56,8 @@
             <div id="admin-login-screen" class="hidden">
                 <h3 class="auth-title" style="color: #003366;">Admin Authentication</h3>
                 <p id="lockout-timer" class="error-text" style="color: #ef4444; font-size: 0.8rem;"></p>
-                <input type="password" id="password-input" placeholder="Enter Admin Password" onkeydown="handleLoginEnter(event)">
+                <input type="text" id="admin-username-input" placeholder="Enter Username" onkeydown="handleLoginEnter(event)">
+                <input type="password" id="password-input" placeholder="Enter Password" onkeydown="handleLoginEnter(event)">
                 <button onclick="checkAdminLogin()" class="btn-primary login-btn" id="btn-admin-login">Verify Identity</button>
                 <button onclick="returnToLanding()" class="btn-text">← Back</button>
             </div>
@@ -97,7 +98,7 @@
                 </div>
                 <div class="user-pill">
                     <button id="btn-cart" class="student-only hidden" onclick="openCartModal()" style="margin-right:15px; background:var(--cit-blue); color:white; border:none; padding:8px 15px; border-radius:20px; cursor:pointer; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                        🛒 Bag (<span id="cart-count">0</span>)
+                        Bag (<span id="cart-count">0</span>)
                     </button>
                     <div id="user-greeting"></div>
                 </div>
@@ -164,31 +165,31 @@
                     </div>
 
                     <div id="admin-controls" class="card admin-only hidden" style="margin-top: 25px;">
-                        <h2 class="card-header" style="margin-bottom: 25px; color: var(--cit-blue);">Add product</h2>
+                        <h2 class="card-header" style="margin-bottom: 25px; color: var(--cit-blue);">Add Equipment</h2>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Name*</label>
-                                <input type="text" id="item-name" placeholder="Equipment Name">
+                                <input type="text" id="item-name" placeholder="Equipment Name" onkeydown="handleAddItemEnter(event)">
                             </div>
                             <div class="form-group">
                                 <label>Item code (Serial)*</label>
-                                <input type="text" id="item-serial" placeholder="Serial Number">
+                                <input type="text" id="item-serial" placeholder="Serial Number" onkeydown="handleAddItemEnter(event)">
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Description*</label>
-                                <input type="text" id="item-description" placeholder="Product Description">
+                                <input type="text" id="item-description" placeholder="Product Description" onkeydown="handleAddItemEnter(event)">
                             </div>
                             <div class="form-group">
                                 <label>Price (₱)*</label>
-                                <input type="number" id="item-price" placeholder="e.g. 1500">
+                                <input type="number" id="item-price" placeholder="e.g. 1500" onkeydown="handleAddItemEnter(event)">
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Category*</label>
-                                <select id="item-category" style="width: 100%; padding: 14px 20px; border-radius: 10px; border: 1px solid var(--border); background: #f8fafc; font-family: inherit; font-size: 0.9rem; color: var(--text-main); appearance: auto;">
+                                <select id="item-category" onkeydown="handleAddItemEnter(event)" style="width: 100%; padding: 14px 20px; border-radius: 10px; border: 1px solid var(--border); background: #f8fafc; font-family: inherit; font-size: 0.9rem; color: var(--text-main); appearance: auto;">
                                     <option value="" disabled selected hidden></option>
                                     <option value="End-User Devices">End-User Devices</option>
                                     <option value="Infrastructure">Infrastructure</option>
@@ -201,7 +202,7 @@
                             <div class="form-group"></div>
                         </div>
                         <div class="form-group" style="margin-top: 25px;">
-                             <button onclick="addNewItem()" class="btn-save">Save product</button>
+                             <button onclick="addNewItem()" class="btn-save">Save Equipment</button>
                         </div>
                     </div>
 
@@ -326,7 +327,7 @@
                             <h2 class="card-header section-title" style="margin: 0; color: var(--cit-blue);">Security Audit Log</h2>
                             
                             <div style="display: flex; gap: 10px; width: 100%; flex-wrap: wrap;">
-                                <input type="text" id="log-search" class="log-filter-input" placeholder="🔍 Search User or Action..." onkeyup="updateLogsView()">
+                                <input type="text" id="log-search" class="log-filter-input" placeholder="Search User or Action..." onkeyup="updateLogsView()">
                                 <input type="date" id="log-date-filter" class="log-filter-input" onchange="updateLogsView()" title="Filter by Date">
                                 <select id="log-type-filter" class="log-filter-input" onchange="updateLogsView()">
                                     <option value="All">All Actions</option>
@@ -377,7 +378,7 @@
     <div id="cart-modal" class="overlay hidden">
         <div class="modal-card" style="max-width: 600px;">
             <h2 style="color: #003366; margin-bottom: 15px; display:flex; justify-content:space-between;">
-                <span>🛒 Equipment Bag</span>
+                <span> Equipment Bag</span>
                 <span id="cart-total-badge" style="font-size: 0.9rem; background: var(--cit-blue); color: white; padding: 4px 12px; border-radius: 20px;">0 Items</span>
             </h2>
             <div class="table-responsive" style="max-height: 250px; overflow-y: auto; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 8px;">
@@ -413,9 +414,6 @@
     <div id="password-modal" class="overlay hidden">
         <div class="modal-card" style="max-width: 400px; text-align: left; padding: 40px 30px;">
             <div style="text-align: center; margin-bottom: 25px;">
-                <div style="background: #e0e7ff; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px;">
-                    <span style="font-size: 1.5rem;">🔒</span>
-                </div>
                 <h2 style="color: var(--cit-blue); margin: 0; font-size: 1.4rem;">Update Admin Password</h2>
                 <p style="color: #64748b; font-size: 0.85rem; margin-top: 8px;">Ensure your new credentials are secure.</p>
             </div>
@@ -491,7 +489,7 @@
 
     <div id="security-alert" class="overlay hidden">
         <div class="modal-card" style="max-width: 400px; border-top: 8px solid #ef4444;">
-            <h2 style="color: #ef4444; margin-bottom: 10px;">⚠️ Security Alert</h2>
+            <h2 style="color: #ef4444; margin-bottom: 10px;">CRITICAL ALERT: High Suspicious Activity Detected</h2>
             <h3 style="color: #991b1b; margin-top: 0; font-size: 1.1rem;">AUTHORIZED PERSONNEL ONLY</h3>
             <p id="security-alert-message" style="color: #64748b; margin-bottom: 25px; line-height: 1.5; font-weight: 500;"></p>
             <button class="btn-danger" onclick="closeAlert()">Acknowledge</button>

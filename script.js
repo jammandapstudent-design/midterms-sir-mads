@@ -1,5 +1,4 @@
 // --- DYNAMIC API URL ---
-// Automatically uses localhost when testing on your computer, and the live Render URL when deployed.
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
     ? 'http://localhost:5000/api' 
     : 'https://midterms-sir-mads-1.onrender.com/api';
@@ -7,7 +6,8 @@ const API_URL = window.location.hostname === 'localhost' || window.location.host
 const SYSTEM_KEY = "CIT-SECURE-1234";
 
 // --- SECURITY STATE ---
-let currentPassword = "admin"; 
+let currentUsername = "admin";
+let currentPassword = "1234"; 
 let failedLoginAttempts = 0;
 const MAX_ATTEMPTS = 3;
 let lockoutEndTime = null;
@@ -31,7 +31,10 @@ async function initApp() {
     try {
         const configRes = await fetch(`${API_URL}/config`);
         const config = await configRes.json();
-        currentPassword = config.pin || "admin"; 
+        
+        // Defaults to 'admin' and '1234' if config isn't set
+        currentUsername = config.username || "admin";
+        currentPassword = config.pin || "1234"; 
 
         const itemsRes = await fetch(`${API_URL}/items`);
         vaultData = await itemsRes.json();
@@ -63,10 +66,10 @@ function restoreSession(role) {
     }
 }
 
-function logoutSession() {
-    // Record exact role text on logout
+// CHANGED TO ASYNC to ensure the log is saved completely before the page reloads
+async function logoutSession() {
     const roleText = sessionStorage.getItem('activeRole') === 'student' ? 'Student' : 'Admin';
-    addLog("User Logged Out", "SUCCESS", roleText);
+    await addLog("User Logged Out", "SUCCESS", roleText);
     sessionStorage.clear(); 
     location.reload(); 
 }
@@ -90,41 +93,37 @@ function returnToLanding() {
 }
 
 function checkAdminLogin() {
-    // 1. Check if the system is currently locked
     if (lockoutEndTime && Date.now() < lockoutEndTime) {
         showSecurityAlert(`SYSTEM LOCKED. Try again in ${Math.ceil((lockoutEndTime - Date.now()) / 1000)} seconds.`);
         return;
     }
 
-    const entered = document.getElementById('password-input').value;
+    const enteredUser = document.getElementById('admin-username-input').value.trim();
+    const enteredPass = document.getElementById('password-input').value;
     
-    // 2. Correct Password
-    if (entered === currentPassword) {
+    // Check both Username and Password
+    if (enteredUser === currentUsername && enteredPass === currentPassword) {
         failedLoginAttempts = 0;
         sessionStorage.setItem('activeRole', 'admin');
         
-        // Logs strictly as "Admin"
         addLog("Administrator Login Verified", "SUCCESS", "Admin");
         setupUI('admin');
         
-    // 3. Incorrect Password
     } else {
         failedLoginAttempts++;
-        document.getElementById('password-input').value = ""; // Clear the input field
+        document.getElementById('password-input').value = ""; 
         
-        // 4. Max Attempts Reached (3 Times)
         if (failedLoginAttempts >= MAX_ATTEMPTS) {
-            lockoutEndTime = Date.now() + 60000; // Set lockout for 60,000 milliseconds (1 Minute)
-            failedLoginAttempts = 0; // Reset attempts after locking
+            lockoutEndTime = Date.now() + 60000; 
+            failedLoginAttempts = 0; 
             
             addLog("BRUTE FORCE DETECTED: Admin Lockout Triggered", "SECURITY ALERT", "System");
             showSecurityAlert("AUTHORIZED PERSONNEL ONLY. Maximum attempts exceeded. System locked for 1 minute.");
             startLockoutTimer();
             
-        // 5. Wrong Attempt (1st or 2nd time)
         } else {
             addLog(`Failed Admin Entry Attempt (${failedLoginAttempts}/${MAX_ATTEMPTS})`, "SECURITY ALERT", "System");
-            showSecurityAlert(`Authorized personnel only. Incorrect password. ${MAX_ATTEMPTS - failedLoginAttempts} attempts remaining.`);
+            showSecurityAlert(`Authorized personnel only. Incorrect credentials. ${MAX_ATTEMPTS - failedLoginAttempts} attempts remaining.`);
         }
     }
 }
@@ -155,7 +154,6 @@ function checkStudentLogin() {
         sessionStorage.setItem('studentName', n);
         sessionStorage.setItem('studentId', sid);
         
-        // Logs strictly as "Student" 
         addLog(`Student Login: ${n} (ID: ${sid})`, "SUCCESS", "Student");
         setupUI('student', { name: n, id: sid });
     } else { alert("Please enter both Name and Student ID."); }
@@ -852,7 +850,9 @@ function applyFilters() {
         });
     }
 
+    // THIS IS WHERE THE BUTTON DESIGNS ARE RENDERED
     updateTable(filteredData);
+    
     updateMaintenanceTable(); 
     
     if(!document.getElementById('view-charts').classList.contains('hidden')) updateChart(); 
@@ -1075,28 +1075,31 @@ function updateTable(dataToDisplay, role = sessionStorage.getItem('activeRole'),
             if (item.status === 'Pending Approval') {
                 actionHtml = `<span style="font-size:0.8rem; color:#64748b;">Check Requests Tab</span>`;
             } else if (item.status === 'Available') {
-                actionHtml = `<button onclick="removeItem('${item._id}')" class="btn-delete-row" style="margin-bottom:5px;">Delete</button>
-                              <button onclick="openReportModal('${item._id}')" class="btn-action-sm" style="background:#ef4444; color:white;">Report Issue</button>`;
+                // RESTORED OLD BUTTON DESIGN (Matched Sizes, Delete = Blue, Report = Red)
+                actionHtml = `<button onclick="removeItem('${item._id}')" class="btn-primary" style="padding: 8px 15px; font-size: 0.85rem; width: 100%; margin-bottom: 5px;">Delete</button><br>
+                              <button onclick="openReportModal('${item._id}')" class="btn-danger" style="padding: 8px 15px; font-size: 0.85rem; width: 100%;">Report Issue</button>`;
             } else {
-                actionHtml = `<button onclick="removeItem('${item._id}')" class="btn-delete-row">Delete Group</button>`;
+                actionHtml = `<button onclick="removeItem('${item._id}')" class="btn-primary" style="padding: 8px 15px; font-size: 0.85rem; width: 100%;">Delete Group</button>`;
             }
             
             row += `${catHtml}${descHtml}${qtyHtml}${serialsHtml}
-                    <td style="width: 180px;">${statusHtml}</td><td>${actionHtml}</td>`;
+                    <td style="width: 180px;">${statusHtml}</td><td style="width: 140px;">${actionHtml}</td>`;
         } else {
             let btn = '';
             if (item.status === 'Available') {
-                btn = `<button onclick="addToCart('${item._id}')" class="btn-action-sm" style="background:var(--cit-blue); color:white; border:none; padding:6px 8px; border-radius:4px; cursor:pointer; width:100%; margin-bottom:5px; font-weight:bold;">🛒 Add to Bag</button>
-                       <button onclick="openReportModal('${item._id}')" class="btn-action-sm" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; width:100%;">Report Issue</button>`;
+                // RESTORED OLD BUTTON DESIGN (Matched Sizes, No Emojis)
+                btn = `<button onclick="addToCart('${item._id}')" class="btn-primary" style="padding: 8px 15px; font-size: 0.85rem; width: 100%; margin-bottom: 5px;">Add to Bag</button><br>
+                       <button onclick="openReportModal('${item._id}')" class="btn-danger" style="padding: 8px 15px; font-size: 0.85rem; width: 100%;">Report Issue</button>`;
             } else if (item.status === 'Pending Approval' && item.borrower === studentData.name) {
                 btn = `<span style="font-size: 0.8rem; color: #6366f1; font-weight: bold;">Waiting...</span>`;
             } else if (item.status === 'Borrowed' && item.borrower === studentData.name) {
-                btn = `<button onclick="returnItem('${item._id}')" class="btn-return">Return</button>`;
+                // Return Button (Same Class/Size Template)
+                btn = `<button onclick="returnItem('${item._id}')" class="btn-secondary" style="padding: 8px 15px; font-size: 0.85rem; width: 100%;">Return</button>`;
             } else {
                 btn = `<span style="font-size: 0.8rem; color: #64748b;">Unavailable</span>`;
             }
             
-            row += `${catHtml}${descHtml}${qtyHtml}<td style="width: 180px;">${statusHtml}</td><td>${btn}</td>`;
+            row += `${catHtml}${descHtml}${qtyHtml}<td style="width: 180px;">${statusHtml}</td><td style="width: 140px;">${btn}</td>`;
         }
         list.innerHTML += row + "</tr>";
     });
@@ -1155,8 +1158,8 @@ function updateMaintenanceTable() {
             let details = `<small style="color:#64748b;">₱${item.repairCost || 0}<br>${item.sentTo || 'Internal'}</small>`;
             
             let actionHtml = `
-                <button onclick="openEditMaintModal('${item._id}')" class="btn-action-sm" style="background:#3b82f6; width:100%; margin-bottom:5px;">Edit Record</button>
-                <button onclick="markAsFixed('${item._id}')" class="btn-action-sm" style="background:#10b981; width:100%;">Mark Fixed (Return)</button>
+                <button onclick="openEditMaintModal('${item._id}')" class="btn-action-sm" style="background:#3b82f6; color:white; border:none; padding:8px; border-radius:6px; width:100%; margin-bottom:5px; font-weight:bold; font-size:0.75rem; cursor:pointer;">Edit Record</button>
+                <button onclick="markAsFixed('${item._id}')" class="btn-action-sm" style="background:#10b981; color:white; border:none; padding:8px; border-radius:6px; width:100%; font-weight:bold; font-size:0.75rem; cursor:pointer;">Mark Fixed (Return)</button>
             `;
             
             row += `<td style="padding: 12px 10px;">${details}</td><td style="padding: 12px 10px;">${returnText}</td><td style="padding: 12px 10px;">${actionHtml}</td>`;
