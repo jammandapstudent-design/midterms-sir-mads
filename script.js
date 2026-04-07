@@ -44,7 +44,6 @@ async function initApp() {
             restoreSession(activeRole);
         }
 
-        // Start the global live countdown clock & progress bars
         startLiveCountdown();
 
     } catch (error) {
@@ -65,7 +64,9 @@ function restoreSession(role) {
 }
 
 function logoutSession() {
-    addLog("User Logged Out", "SUCCESS", sessionStorage.getItem('studentName') || 'admin');
+    // Record exact role text on logout
+    const roleText = sessionStorage.getItem('activeRole') === 'student' ? 'Student' : 'Admin';
+    addLog("User Logged Out", "SUCCESS", roleText);
     sessionStorage.clear(); 
     location.reload(); 
 }
@@ -89,29 +90,41 @@ function returnToLanding() {
 }
 
 function checkAdminLogin() {
+    // 1. Check if the system is currently locked
     if (lockoutEndTime && Date.now() < lockoutEndTime) {
         showSecurityAlert(`SYSTEM LOCKED. Try again in ${Math.ceil((lockoutEndTime - Date.now()) / 1000)} seconds.`);
         return;
     }
 
     const entered = document.getElementById('password-input').value;
+    
+    // 2. Correct Password
     if (entered === currentPassword) {
         failedLoginAttempts = 0;
         sessionStorage.setItem('activeRole', 'admin');
-        addLog("Administrator Login Verified", "SUCCESS", "admin");
+        
+        // Logs strictly as "Admin"
+        addLog("Administrator Login Verified", "SUCCESS", "Admin");
         setupUI('admin');
+        
+    // 3. Incorrect Password
     } else {
         failedLoginAttempts++;
-        document.getElementById('password-input').value = "";
+        document.getElementById('password-input').value = ""; // Clear the input field
+        
+        // 4. Max Attempts Reached (3 Times)
         if (failedLoginAttempts >= MAX_ATTEMPTS) {
-            lockoutEndTime = Date.now() + 30000; 
-            failedLoginAttempts = 0; 
-            addLog("BRUTE FORCE DETECTED: Admin Lockout Triggered", "SECURITY ALERT", "system");
-            showSecurityAlert("MAXIMUM ATTEMPTS EXCEEDED. SYSTEM LOCKED FOR 30 SECONDS.");
+            lockoutEndTime = Date.now() + 60000; // Set lockout for 60,000 milliseconds (1 Minute)
+            failedLoginAttempts = 0; // Reset attempts after locking
+            
+            addLog("BRUTE FORCE DETECTED: Admin Lockout Triggered", "SECURITY ALERT", "System");
+            showSecurityAlert("AUTHORIZED PERSONNEL ONLY. Maximum attempts exceeded. System locked for 1 minute.");
             startLockoutTimer();
+            
+        // 5. Wrong Attempt (1st or 2nd time)
         } else {
-            addLog(`Failed Admin Entry Attempt (${failedLoginAttempts}/${MAX_ATTEMPTS})`, "SECURITY ALERT", "system");
-            showSecurityAlert(`Incorrect Password. ${MAX_ATTEMPTS - failedLoginAttempts} attempts remaining.`);
+            addLog(`Failed Admin Entry Attempt (${failedLoginAttempts}/${MAX_ATTEMPTS})`, "SECURITY ALERT", "System");
+            showSecurityAlert(`Authorized personnel only. Incorrect password. ${MAX_ATTEMPTS - failedLoginAttempts} attempts remaining.`);
         }
     }
 }
@@ -141,7 +154,9 @@ function checkStudentLogin() {
         sessionStorage.setItem('activeRole', 'student');
         sessionStorage.setItem('studentName', n);
         sessionStorage.setItem('studentId', sid);
-        addLog(`Student Login: ${n} (ID: ${sid})`, "SUCCESS", n);
+        
+        // Logs strictly as "Student" 
+        addLog(`Student Login: ${n} (ID: ${sid})`, "SUCCESS", "Student");
         setupUI('student', { name: n, id: sid });
     } else { alert("Please enter both Name and Student ID."); }
 }
@@ -160,7 +175,9 @@ function setupUI(role, studentData = null) {
     studentElements.forEach(el => el.classList.toggle('hidden', isAdmin));
 
     const tableTitle = document.querySelector('.table-tools .section-title');
-    if (tableTitle) {
+    if (tableTitle && !document.getElementById('view-logs').classList.contains('hidden')) {
+        // Skip renaming if on logs tab
+    } else if (tableTitle) {
         tableTitle.innerText = isAdmin ? "Secure Vault (3DES Protected)" : "Available Equipment";
     }
 
@@ -171,7 +188,7 @@ function setupUI(role, studentData = null) {
     switchNav('home');
     
     if (isAdmin) {
-        renderAuditLogs();
+        updateLogsView(); 
     } else {
         updateStudentHistory();
         updateCartBadge();
@@ -189,6 +206,7 @@ function switchNav(view) {
     document.getElementById('nav-maintenance').classList.remove('active');
     document.getElementById('nav-charts').classList.remove('active');
     if(document.getElementById('nav-requests')) document.getElementById('nav-requests').classList.remove('active');
+    if(document.getElementById('nav-logs')) document.getElementById('nav-logs').classList.remove('active');
     
     if(document.getElementById(`nav-${view}`)) document.getElementById(`nav-${view}`).classList.add('active');
 
@@ -196,13 +214,14 @@ function switchNav(view) {
     document.getElementById('view-maintenance').classList.add('hidden');
     document.getElementById('view-charts').classList.add('hidden');
     document.getElementById('view-requests').classList.add('hidden');
+    if(document.getElementById('view-logs')) document.getElementById('view-logs').classList.add('hidden');
     
     document.getElementById(`view-${view}`).classList.remove('hidden');
 
     if (view === 'charts') updateChart();
     if (view === 'requests') renderRequestsView();
+    if (view === 'logs') updateLogsView();
 }
-
 
 // --- 3DES ENGINE ---
 function xorStrings(t, k) {
@@ -267,7 +286,7 @@ function decrypt3DES(enc) {
 }
 
 // --- LOGGING & HISTORY ---
-async function addLog(action, status, relatedUser = 'admin') {
+async function addLog(action, status, relatedUser = 'Admin') {
     const timestamp = new Date().toLocaleString();
     const newLog = { action, status, user: relatedUser, timestamp };
     try {
@@ -275,28 +294,147 @@ async function addLog(action, status, relatedUser = 'admin') {
         const savedLog = await res.json();
         auditLogs.unshift(savedLog);
         
-        if(sessionStorage.getItem('activeRole') === 'admin') renderAuditLogs();
+        if(sessionStorage.getItem('activeRole') === 'admin') updateLogsView();
         if(sessionStorage.getItem('activeRole') === 'student') updateStudentHistory();
         
     } catch(err) { console.error(err); }
 }
 
-function renderAuditLogs() {
-    const logDiv = document.getElementById('audit-list');
-    if (logDiv) {
-        logDiv.innerHTML = auditLogs.map(log => {
-            let color = log.status === 'SUCCESS' ? '#10b981' : (log.status === 'DELETED' ? '#dc2626' : '#ef4444');
-            return `[${log.timestamp}] <span style="color:${color}; font-weight:bold;">${log.status}</span>: ${log.action}`;
-        }).join('<br><br>');
+// NEW DEDICATED LOGS VIEW 
+function updateLogsView() {
+    if(!document.getElementById('view-logs') || document.getElementById('view-logs').classList.contains('hidden')) return;
+
+    const todayStr = new Date().toLocaleDateString();
+    let loginsToday = 0;
+    let requestsToday = 0;
+    let processedToday = 0;
+    let failedAttempts = 0;
+    let securityFlags = 0;
+
+    const searchQuery = document.getElementById('log-search').value.toLowerCase();
+    const dateQuery = document.getElementById('log-date-filter').value;
+    const typeQuery = document.getElementById('log-type-filter').value;
+    const roleQuery = document.getElementById('log-role-filter').value;
+
+    const filteredLogs = auditLogs.filter(log => {
+        let logDateRaw = log.timestamp.split(',')[0].trim();
+        let logDateObj = new Date(logDateRaw);
+
+        // Safely map the user (prevents "undefined" from older logs)
+        let safeUser = log.user && log.user !== 'undefined' ? log.user : (log.action.toLowerCase().includes('student') ? 'Student' : 'Admin');
+
+        // --- DASHBOARD METRICS GATHERING ---
+        if (logDateRaw === todayStr) {
+            let act = log.action.toLowerCase();
+            if (act.includes('login') && log.status === 'SUCCESS') loginsToday++;
+            if (act.includes('requested cart checkout')) requestsToday++;
+            if (act.includes('approved') || act.includes('rejected')) processedToday++;
+            if (log.status === 'SECURITY ALERT' || act.includes('failed')) failedAttempts++;
+            if (log.status === 'DELETED') securityFlags++;
+        }
+
+        // --- TABLE FILTERING LOGIC ---
+        let matchSearch = log.action.toLowerCase().includes(searchQuery) || safeUser.toLowerCase().includes(searchQuery);
+        
+        let matchDate = true;
+        if (dateQuery) {
+            let selectedDateObj = new Date(dateQuery);
+            matchDate = logDateObj.toLocaleDateString() === selectedDateObj.toLocaleDateString();
+        }
+
+        let matchType = true;
+        if (typeQuery === 'Login') matchType = log.action.toLowerCase().includes('login');
+        if (typeQuery === 'Borrow') matchType = log.action.toLowerCase().includes('request') || log.action.toLowerCase().includes('approv') || log.action.toLowerCase().includes('return');
+        if (typeQuery === 'System') matchType = log.status === 'DELETED' || log.action.toLowerCase().includes('password') || log.action.toLowerCase().includes('registered');
+
+        let matchRole = true;
+        if (roleQuery === 'Admin') matchRole = safeUser.toLowerCase() === 'admin' || safeUser.toLowerCase() === 'system';
+        if (roleQuery === 'Student') matchRole = safeUser.toLowerCase() !== 'admin' && safeUser.toLowerCase() !== 'system';
+
+        return matchSearch && matchDate && matchType && matchRole;
+    });
+
+    // Update Top Metrics
+    document.getElementById('log-metric-logins').innerText = loginsToday;
+    document.getElementById('log-metric-requests').innerText = requestsToday;
+    document.getElementById('log-metric-processed').innerText = processedToday;
+    document.getElementById('log-metric-failed').innerText = failedAttempts;
+
+    // Smart Security Alert Banner Logic
+    const alertBanner = document.getElementById('security-status-banner');
+    const alertTitle = document.getElementById('security-status-title');
+    const alertDesc = document.getElementById('security-status-desc');
+
+    if (failedAttempts >= 3 || securityFlags >= 2) {
+        alertBanner.style.background = '#fef2f2';
+        alertBanner.style.borderLeft = '5px solid #ef4444';
+        alertTitle.style.color = '#991b1b';
+        alertTitle.innerHTML = '⚠️ CRITICAL ALERT: High Suspicious Activity Detected';
+        alertDesc.style.color = '#b91c1c';
+        alertDesc.innerHTML = `Multiple failed logins (${failedAttempts}) or critical deletions (${securityFlags}) recorded today. Review immediately.`;
+    } else if (failedAttempts > 0 || securityFlags > 0) {
+        alertBanner.style.background = '#fffbeb';
+        alertBanner.style.borderLeft = '5px solid #f59e0b';
+        alertTitle.style.color = '#92400e';
+        alertTitle.innerHTML = '⚠️ WARNING: Elevated System Activity';
+        alertDesc.style.color = '#b45309';
+        alertDesc.innerHTML = 'Monitor recent failed password attempts or inventory deletions.';
+    } else {
+        alertBanner.style.background = '#ecfdf5';
+        alertBanner.style.borderLeft = '5px solid #10b981';
+        alertTitle.style.color = '#065f46';
+        alertTitle.innerHTML = '🛡️ System Status: Secure';
+        alertDesc.style.color = '#047857';
+        alertDesc.innerHTML = 'No suspicious activities detected today.';
     }
+
+    // Render Filtered Table
+    const tbody = document.getElementById('audit-table-body');
+    if (filteredLogs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 20px; color:#64748b;">No logs match your current filters.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filteredLogs.map(log => {
+        let badgeColor = '#10b981'; // Green Default
+        let badgeText = 'Normal';
+        
+        let act = log.action.toLowerCase();
+        
+        if (log.status === 'SECURITY ALERT' || log.status === 'DELETED' || act.includes('failed') || act.includes('reject')) {
+            badgeColor = '#ef4444'; // Red
+            badgeText = 'Critical';
+        } else if (log.status === 'PENDING' || act.includes('password') || act.includes('updated') || act.includes('request')) {
+            badgeColor = '#f59e0b'; // Yellow
+            badgeText = 'Warning / Auth';
+        }
+
+        // Clean user fallback again for rendering
+        let displayUser = log.user && log.user !== 'undefined' ? log.user : (log.action.toLowerCase().includes('student') ? 'Student' : 'Admin');
+
+        return `
+        <tr style="border-bottom: 1px solid var(--border); transition: 0.2s;">
+            <td style="padding: 15px; color: #64748b; font-size: 0.85rem; width: 200px;">${log.timestamp}</td>
+            <td style="padding: 15px; width: 150px;"><strong>${displayUser}</strong></td>
+            <td style="padding: 15px;">${log.action}</td>
+            <td style="padding: 15px; width: 150px;">
+                <span style="background: ${badgeColor}; color: white; padding: 6px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; display:inline-block; text-align:center; width: 100px;">
+                    ${badgeText}
+                </span>
+            </td>
+        </tr>`;
+    }).join('');
 }
+
 
 function updateStudentHistory() {
     const list = document.getElementById('student-history-list');
     if (!list) return;
 
     const myName = sessionStorage.getItem('studentName');
-    const myLogs = auditLogs.filter(log => log.user === myName);
+    
+    // Students only see requests connected to their name OR generic Student login logs
+    const myLogs = auditLogs.filter(log => log.user === myName || log.user === 'Student');
     
     if(myLogs.length === 0) {
         list.innerHTML = `<tr><td colspan="3" style="text-align:center; padding: 20px; color:#64748b;">No past transactions found.</td></tr>`;
@@ -306,7 +444,7 @@ function updateStudentHistory() {
     list.innerHTML = myLogs.map(log => {
         let badgeClass = 'badge-available'; 
         if (log.status === 'PENDING' || log.action.includes('Requested') || log.action.includes('Reported')) badgeClass = 'badge-pending';
-        if (log.status === 'DELETED' || log.action.includes('Rejected')) badgeClass = 'badge-maintenance'; 
+        if (log.status === 'DELETED' || log.action.includes('Rejected') || log.status === 'SECURITY ALERT') badgeClass = 'badge-maintenance'; 
         
         return `<tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 12px 15px;"><small style="color:#64748b;">${log.timestamp}</small></td>
@@ -525,7 +663,6 @@ async function checkoutCart() {
 function renderRequestsView() {
     const container = document.getElementById('requests-container');
     
-    // UPDATED: Now actively filters based on the Global Search Bar
     const pendingData = vaultData.filter(i => {
         let isPending = i.status === 'Pending Approval';
         let matchesSearch = i.equipment.toLowerCase().includes(searchQuery);
@@ -594,7 +731,6 @@ function renderRequestsView() {
     container.innerHTML = html;
 }
 
-// UPDATED: Now properly handles items grouped under 'LEGACY-REQUEST'
 async function approveTransaction(txId) {
     let itemsToApprove = vaultData.filter(i => i.status === 'Pending Approval' && (i.transactionId || 'LEGACY-REQUEST') === txId);
     if(itemsToApprove.length === 0) return;
@@ -611,7 +747,6 @@ async function approveTransaction(txId) {
     applyFilters();
 }
 
-// UPDATED: Now properly handles items grouped under 'LEGACY-REQUEST'
 async function rejectTransaction(txId) {
     if(!confirm("Are you sure you want to completely reject and cancel this entire request?")) return;
     let itemsToReject = vaultData.filter(i => i.status === 'Pending Approval' && (i.transactionId || 'LEGACY-REQUEST') === txId);
@@ -638,7 +773,6 @@ async function rejectTransaction(txId) {
     applyFilters();
 }
 
-// NEW: Global function to approve an individual line item inside a request
 async function approveSingleItem(id) {
     let item = vaultData.find(i => i._id === id);
     if(!item) return;
@@ -653,7 +787,6 @@ async function approveSingleItem(id) {
     applyFilters();
 }
 
-// NEW: Global function to reject an individual line item inside a request
 async function rejectSingleItem(id) {
     let item = vaultData.find(i => i._id === id);
     if(!item) return;
@@ -678,7 +811,6 @@ async function rejectSingleItem(id) {
     vaultData = await itemsRes.json();
     applyFilters();
 }
-
 
 // --- SEARCH, FILTERS & GENERAL RENDERING ---
 function handleSearch() {
@@ -712,7 +844,6 @@ function applyFilters() {
         return matchesStatus && matchesSearch;
     });
 
-    // NEW: Auto-Sort by Deadline for Borrowed Items
     if (currentFilter === 'Borrowed') {
         filteredData.sort((a, b) => {
             if (!a.returnDate) return 1;
@@ -726,6 +857,7 @@ function applyFilters() {
     
     if(!document.getElementById('view-charts').classList.contains('hidden')) updateChart(); 
     if(!document.getElementById('view-requests').classList.contains('hidden')) renderRequestsView();
+    if(!document.getElementById('view-logs').classList.contains('hidden')) updateLogsView();
 }
 
 function updateStudentAnalytics() {
@@ -1058,13 +1190,13 @@ async function addNewItem() {
         existingItem.serials.push(encryptedSerial);
         try {
             await fetch(`${API_URL}/items/${existingItem._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(existingItem) });
-            addLog(`Combined Serial into existing group: ${n}`, "SUCCESS", "admin");
+            addLog(`Combined Serial into existing group: ${n}`, "SUCCESS", "Admin");
         } catch(err) { console.error(err); return; }
     } else {
         const newItem = { equipment: n, category: cat, description: desc, price: Number(price), serials: [encryptedSerial], status: 'Available' };
         try {
             await fetch(`${API_URL}/items`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newItem) });
-            addLog(`Registered New Item Group: ${n}`, "SUCCESS", "admin");
+            addLog(`Registered New Item Group: ${n}`, "SUCCESS", "Admin");
         } catch(err) { console.error(err); return; }
     }
 
@@ -1173,7 +1305,7 @@ async function saveMaintenanceUpdate() {
 
     try {
         await fetch(`${API_URL}/items/${item._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
-        addLog(`Updated repair record: ${item.equipment} (${item.repairStatus})`, "SUCCESS", "admin");
+        addLog(`Updated repair record: ${item.equipment} (${item.repairStatus})`, "SUCCESS", "Admin");
         closeEditMaintModal();
         
         const itemsRes = await fetch(`${API_URL}/items`);
@@ -1206,7 +1338,7 @@ async function markAsFixed(id) {
         await fetch(`${API_URL}/items/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(repairedItem) });
     }
 
-    addLog(`Fixed & Returned to Vault: ${repairedItem.equipment}`, "SUCCESS", "admin");
+    addLog(`Fixed & Returned to Vault: ${repairedItem.equipment}`, "SUCCESS", "Admin");
     const itemsRes = await fetch(`${API_URL}/items`);
     vaultData = await itemsRes.json();
     applyFilters();
@@ -1216,7 +1348,7 @@ async function markAsFixed(id) {
 function unlockItem(id, index = 0) {
     const item = vaultData.find(i => i._id === id);
     const decryptedSerial = decrypt3DES(item.serials[index]);
-    addLog(`Decrypted ${item.equipment}`, "SUCCESS", "admin");
+    addLog(`Decrypted ${item.equipment}`, "SUCCESS", "Admin");
     alert(`🔓 Original Serial: ${decryptedSerial}`);
 }
 
@@ -1225,7 +1357,7 @@ function unlockSelectedSerial(id) {
     const selectEl = document.getElementById(`serial-select-${id}`);
     const selectedIndex = selectEl.value;
     const decryptedSerial = decrypt3DES(item.serials[selectedIndex]);
-    addLog(`Decrypted ${item.equipment} (Serial #${parseInt(selectedIndex) + 1})`, "SUCCESS", "admin");
+    addLog(`Decrypted ${item.equipment} (Serial #${parseInt(selectedIndex) + 1})`, "SUCCESS", "Admin");
     alert(`🔓 Original Serial: ${decryptedSerial}`);
 }
 
@@ -1267,10 +1399,10 @@ async function saveNewPassword() {
     if (oldPass === currentPassword) {
         currentPassword = newPass;
         await fetch(`${API_URL}/config`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: currentPassword }) });
-        addLog("Admin Password Changed", "SUCCESS", "admin"); 
+        addLog("Admin Password Changed", "SUCCESS", "Admin"); 
         alert("Password Updated!"); closePasswordModal();
     } else {
-        addLog("Failed Password Update Attempt", "SECURITY ALERT", "admin"); alert("Incorrect Old Password.");
+        addLog("Failed Password Update Attempt", "SECURITY ALERT", "Admin"); alert("Incorrect Old Password.");
     }
 }
 

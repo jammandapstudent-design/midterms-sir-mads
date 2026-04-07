@@ -14,10 +14,7 @@
             50% { transform: scale(1.02); opacity: 0.8; text-shadow: 0 0 8px rgba(239, 68, 68, 0.6); }
             100% { transform: scale(1); opacity: 1; text-shadow: 0 0 0 rgba(239, 68, 68, 0); }
         }
-        .pulse-red {
-            animation: pulseRed 1.2s infinite;
-            display: inline-block;
-        }
+        .pulse-red { animation: pulseRed 1.2s infinite; display: inline-block; }
         
         /* Flashing Background for Overdue Rows */
         @keyframes flashRow {
@@ -25,8 +22,19 @@
             50% { background-color: rgba(239, 68, 68, 0.08); }
             100% { background-color: transparent; }
         }
-        .row-overdue {
-            animation: flashRow 2s infinite;
+        .row-overdue { animation: flashRow 2s infinite; }
+
+        /* Custom Inputs for the Log Filters */
+        .log-filter-input {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            font-family: inherit;
+            font-size: 0.85rem;
+            background: #f8fafc;
+            color: #1e293b;
+            flex: 1;
+            min-width: 150px;
         }
     </style>
 </head>
@@ -74,6 +82,7 @@
                 <a href="#" class="nav-item admin-only hidden" id="nav-requests" onclick="switchNav('requests')"><span>📥</span> Requests</a>
                 <a href="#" class="nav-item" id="nav-maintenance" onclick="switchNav('maintenance')"><span>🔧</span> Maintenance</a>
                 <a href="#" class="nav-item" id="nav-charts" onclick="switchNav('charts')"><span>📊</span> Charts</a>
+                <a href="#" class="nav-item admin-only hidden" id="nav-logs" onclick="switchNav('logs')"><span>🛡️</span> Security Logs</a>
             </nav>
             <div class="sidebar-footer">
                 <button id="btn-update-password" class="btn-sidebar admin-only hidden" onclick="openPasswordModal()">⚙️ Settings</button>
@@ -231,16 +240,6 @@
                             </table>
                         </div>
                     </div>
-
-                    <div id="audit-log-container" class="card admin-only hidden" style="border-left: 5px solid #003366;">
-                        <h2 class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                            Security Audit Log
-                            <span style="font-size: 0.7rem; color: #10b981; background: #d1fae5; padding: 4px 10px; border-radius: 12px; font-weight: bold;">Live Monitoring</span>
-                        </h2>
-                        <div id="audit-list" class="log-viewer">
-                            <div style="color: #64748b;"> Initializing Secure Environment </div>
-                        </div>
-                    </div>
                 </div> 
 
                 <div id="view-requests" class="hidden">
@@ -293,6 +292,69 @@
                             <div style="position: relative; height: 300px; width: 100%;">
                                 <canvas id="popularChart"></canvas>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-logs" class="hidden">
+                    <div id="security-status-banner" class="card" style="background: #ecfdf5; border-left: 5px solid #10b981; margin-bottom: 20px; padding: 20px; transition: 0.4s;">
+                        <h3 id="security-status-title" style="color: #065f46; margin:0; font-size: 1.2rem;">🛡️ System Status: Secure</h3>
+                        <p id="security-status-desc" style="margin: 5px 0 0 0; color: #047857; font-size: 0.9rem;">No suspicious activities detected today.</p>
+                    </div>
+
+                    <div class="metrics-grid" style="margin-bottom: 20px;">
+                        <div class="metric-card">
+                            <div class="metric-value" id="log-metric-logins" style="color:#3b82f6;">0</div>
+                            <div class="metric-label">TOTAL LOGINS TODAY</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="log-metric-requests" style="color:#f59e0b;">0</div>
+                            <div class="metric-label">NEW BORROW REQUESTS</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="log-metric-processed" style="color:#10b981;">0</div>
+                            <div class="metric-label">REQUESTS PROCESSED</div>
+                        </div>
+                        <div class="metric-card" style="border-bottom: 3px solid #ef4444;">
+                            <div class="metric-value" id="log-metric-failed" style="color:#ef4444;">0</div>
+                            <div class="metric-label">FAILED ATTEMPTS / ALERTS</div>
+                        </div>
+                    </div>
+
+                    <div class="card table-card">
+                        <div class="table-tools" style="flex-direction: column; align-items: flex-start; gap: 15px; margin-bottom: 25px;">
+                            <h2 class="card-header section-title" style="margin: 0; color: var(--cit-blue);">Security Audit Log</h2>
+                            
+                            <div style="display: flex; gap: 10px; width: 100%; flex-wrap: wrap;">
+                                <input type="text" id="log-search" class="log-filter-input" placeholder=" Search User or Action..." onkeyup="updateLogsView()">
+                                <input type="date" id="log-date-filter" class="log-filter-input" onchange="updateLogsView()" title="Filter by Date">
+                                <select id="log-type-filter" class="log-filter-input" onchange="updateLogsView()">
+                                    <option value="All">All Actions</option>
+                                    <option value="Login">Logins</option>
+                                    <option value="Borrow">Borrowing & Returns</option>
+                                    <option value="System">System & Deletions</option>
+                                </select>
+                                <select id="log-role-filter" class="log-filter-input" onchange="updateLogsView()">
+                                    <option value="All">All Users</option>
+                                    <option value="Admin">Admins Only</option>
+                                    <option value="Student">Students Only</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                            <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                                <thead style="position: sticky; top: 0; background: white; z-index: 10;">
+                                    <tr style="border-bottom: 2px solid var(--border); color: var(--text-muted); font-size: 0.85rem;">
+                                        <th style="padding: 12px 15px;">Date & Time</th>
+                                        <th style="padding: 12px 15px;">User</th>
+                                        <th style="padding: 12px 15px;">Action Details</th>
+                                        <th style="padding: 12px 15px;">Threat Level</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audit-table-body">
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -412,6 +474,15 @@
                 <button class="btn-primary" style="flex: 1;" onclick="saveMaintenanceUpdate()">Save Updates</button>
                 <button class="btn-danger" style="flex: 1;" onclick="closeEditMaintModal()">Cancel</button>
             </div>
+        </div>
+    </div>
+
+    <div id="security-alert" class="overlay hidden">
+        <div class="modal-card" style="max-width: 400px; border-top: 8px solid #ef4444;">
+            <h2 style="color: #ef4444; margin-bottom: 10px;"> Security Alert</h2>
+            <h3 style="color: #991b1b; margin-top: 0; font-size: 1.1rem;">AUTHORIZED PERSONNEL ONLY</h3>
+            <p id="security-alert-message" style="color: #64748b; margin-bottom: 25px; line-height: 1.5; font-weight: 500;"></p>
+            <button class="btn-danger" onclick="closeAlert()">Acknowledge</button>
         </div>
     </div>
 
