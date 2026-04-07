@@ -524,10 +524,16 @@ async function checkoutCart() {
 // --- ADMIN: TRANSACTIONS / REQUESTS VIEW ---
 function renderRequestsView() {
     const container = document.getElementById('requests-container');
-    const pendingData = vaultData.filter(i => i.status === 'Pending Approval');
+    
+    // UPDATED: Now actively filters based on the Global Search Bar
+    const pendingData = vaultData.filter(i => {
+        let isPending = i.status === 'Pending Approval';
+        let matchesSearch = i.equipment.toLowerCase().includes(searchQuery);
+        return isPending && matchesSearch;
+    });
 
     if (pendingData.length === 0) {
-        container.innerHTML = `<div style="text-align:center; padding: 40px; color:#64748b; background: #f8fafc; border-radius: 12px; border: 1px dashed var(--border);">There are no pending borrow requests at this time.</div>`;
+        container.innerHTML = `<div style="text-align:center; padding: 40px; color:#64748b; background: #f8fafc; border-radius: 12px; border: 1px dashed var(--border);">There are no pending borrow requests matching your search.</div>`;
         return;
     }
 
@@ -548,12 +554,16 @@ function renderRequestsView() {
             return `<tr style="border-bottom: 1px solid var(--border);">
                 <td style="padding: 8px;"><strong>${i.equipment}</strong> <span style="color:#64748b; font-size:0.8rem;">(${i.category})</span></td>
                 <td style="padding: 8px; text-align:center;"><span style="font-weight:bold; color:var(--cit-blue); background:#e2e8f0; padding:4px 10px; border-radius:20px;">${i.serials.length}</span></td>
+                <td style="padding: 8px; text-align:center;">
+                    <button onclick="approveSingleItem('${i._id}')" style="background:#10b981; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.75rem; font-weight:bold; margin-right:5px; transition:0.2s;">Approve</button>
+                    <button onclick="rejectSingleItem('${i._id}')" style="background:#ef4444; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.75rem; font-weight:bold; transition:0.2s;">Reject</button>
+                </td>
             </tr>`;
         }).join('');
 
         html += `
-        <div style="border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-            <div style="background: #f8fafc; padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px;">
+            <div style="background: #f8fafc; padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                 <div>
                     <h3 style="margin: 0; color: var(--cit-blue); font-size: 1.1rem;">${group.transactionId}</h3>
                     <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #64748b;">
@@ -563,8 +573,8 @@ function renderRequestsView() {
                     </p>
                 </div>
                 <div style="display: flex; gap: 10px;">
-                    <button onclick="approveTransaction('${group.transactionId}')" class="btn-primary" style="background:#10b981; padding: 8px 15px; font-size: 0.85rem;">Approve All</button>
-                    <button onclick="rejectTransaction('${group.transactionId}')" class="btn-danger" style="padding: 8px 15px; font-size: 0.85rem;">Reject All</button>
+                    <button onclick="approveTransaction('${group.transactionId}')" class="btn-primary" style="background:#10b981; padding: 10px 15px; font-size: 0.85rem; width: 120px; text-align: center; margin: 0;">Approve All</button>
+                    <button onclick="rejectTransaction('${group.transactionId}')" class="btn-danger" style="padding: 10px 15px; font-size: 0.85rem; width: 120px; text-align: center; margin: 0;">Reject All</button>
                 </div>
             </div>
             <div style="padding: 15px 20px;">
@@ -573,6 +583,7 @@ function renderRequestsView() {
                         <tr style="border-bottom: 2px solid var(--border); color: #64748b; font-size: 0.8rem;">
                             <th style="padding: 8px;">Requested Equipment</th>
                             <th style="padding: 8px; text-align:center;">Requested Qty</th>
+                            <th style="padding: 8px; text-align:center;">Individual Action</th>
                         </tr>
                     </thead>
                     <tbody>${itemRows}</tbody>
@@ -583,27 +594,32 @@ function renderRequestsView() {
     container.innerHTML = html;
 }
 
+// UPDATED: Now properly handles items grouped under 'LEGACY-REQUEST'
 async function approveTransaction(txId) {
-    let itemsToApprove = vaultData.filter(i => i.status === 'Pending Approval' && i.transactionId === txId);
-    let borrowerName = "";
+    let itemsToApprove = vaultData.filter(i => i.status === 'Pending Approval' && (i.transactionId || 'LEGACY-REQUEST') === txId);
+    if(itemsToApprove.length === 0) return;
+
+    let borrowerName = itemsToApprove[0].borrower;
     for (let item of itemsToApprove) {
-        borrowerName = item.borrower;
         item.status = 'Borrowed';
         await fetch(`${API_URL}/items/${item._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
     }
     addLog(`Approved batch request [${txId}] for ${borrowerName}`, "SUCCESS", borrowerName);
+    
     const itemsRes = await fetch(`${API_URL}/items`);
     vaultData = await itemsRes.json();
     applyFilters();
 }
 
+// UPDATED: Now properly handles items grouped under 'LEGACY-REQUEST'
 async function rejectTransaction(txId) {
     if(!confirm("Are you sure you want to completely reject and cancel this entire request?")) return;
-    let itemsToReject = vaultData.filter(i => i.status === 'Pending Approval' && i.transactionId === txId);
-    let borrowerName = "";
+    let itemsToReject = vaultData.filter(i => i.status === 'Pending Approval' && (i.transactionId || 'LEGACY-REQUEST') === txId);
+    if(itemsToReject.length === 0) return;
+
+    let borrowerName = itemsToReject[0].borrower;
 
     for (let item of itemsToReject) {
-        borrowerName = item.borrower;
         const existingAvailableGroup = vaultData.find(i => i.equipment.toLowerCase() === item.equipment.toLowerCase() && i.status === 'Available' && i._id !== item._id);
         
         if (existingAvailableGroup) {
@@ -616,11 +632,52 @@ async function rejectTransaction(txId) {
         }
     }
     addLog(`Rejected batch request [${txId}] by ${borrowerName}`, "DELETED", borrowerName);
+    
     const itemsRes = await fetch(`${API_URL}/items`);
     vaultData = await itemsRes.json();
     applyFilters();
 }
 
+// NEW: Global function to approve an individual line item inside a request
+async function approveSingleItem(id) {
+    let item = vaultData.find(i => i._id === id);
+    if(!item) return;
+
+    item.status = 'Borrowed';
+    await fetch(`${API_URL}/items/${item._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+    
+    addLog(`Approved individual item: ${item.equipment}`, "SUCCESS", item.borrower);
+    
+    const itemsRes = await fetch(`${API_URL}/items`);
+    vaultData = await itemsRes.json();
+    applyFilters();
+}
+
+// NEW: Global function to reject an individual line item inside a request
+async function rejectSingleItem(id) {
+    let item = vaultData.find(i => i._id === id);
+    if(!item) return;
+
+    if(!confirm(`Reject request for ${item.equipment}?`)) return;
+
+    const borrowerName = item.borrower;
+    const existingAvailableGroup = vaultData.find(i => i.equipment.toLowerCase() === item.equipment.toLowerCase() && i.status === 'Available' && i._id !== item._id);
+    
+    if (existingAvailableGroup) {
+        existingAvailableGroup.serials.push(...item.serials);
+        await fetch(`${API_URL}/items/${existingAvailableGroup._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(existingAvailableGroup) });
+        await fetch(`${API_URL}/items/${item._id}`, { method: 'DELETE' });
+    } else {
+        item.status = 'Available'; item.borrower = ''; item.returnDate = ''; item.transactionId = ''; item.purpose = '';
+        await fetch(`${API_URL}/items/${item._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+    }
+
+    addLog(`Rejected individual item: ${item.equipment} for ${borrowerName}`, "DELETED", borrowerName);
+    
+    const itemsRes = await fetch(`${API_URL}/items`);
+    vaultData = await itemsRes.json();
+    applyFilters();
+}
 
 
 // --- SEARCH, FILTERS & GENERAL RENDERING ---

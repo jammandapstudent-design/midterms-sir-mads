@@ -108,7 +108,18 @@ body {
 }
 
 .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
-.sidebar-logo-icon { background: white; color: var(--cit-blue); padding: 8px; border-radius: 8px; font-weight: 900; }
+
+/* NEW LOGO STYLING ADDED HERE */
+.sidebar-logo-img {
+    width: 38px;
+    height: 38px;
+    background-color: var(--white);
+    padding: 3px;
+    border-radius: 8px;
+    object-fit: contain;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
 .sidebar-header h2 { font-size: 1.4rem; margin: 0; }
 
 .sidebar-nav { flex-grow: 1; }
