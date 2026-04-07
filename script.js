@@ -1,4 +1,9 @@
-const API_URL = 'http://localhost:5000/api';
+// --- DYNAMIC API URL ---
+// Automatically uses localhost when testing on your computer, and the live Render URL when deployed.
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:5000/api' 
+    : 'https://midterms-sir-mads-1.onrender.com/api';
+
 const SYSTEM_KEY = "CIT-SECURE-1234";
 
 // --- SECURITY STATE ---
