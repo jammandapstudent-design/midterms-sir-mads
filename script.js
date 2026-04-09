@@ -1,4 +1,5 @@
 // --- DYNAMIC API URL ---
+// Automatically detects if you are on your computer or the live Render site!
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
     ? 'http://localhost:5000/api' 
     : 'https://midterms-sir-mads-1.onrender.com/api';
@@ -54,7 +55,14 @@ async function initApp() {
     }
 }
 
-window.onload = initApp;
+// Ensure the scroll listener attaches to the correct container for the layout
+document.addEventListener('DOMContentLoaded', () => {
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+        mainContent.addEventListener('scroll', toggleScrollButton);
+    }
+    initApp();
+});
 
 function restoreSession(role) {
     if (role === 'admin') {
@@ -66,7 +74,6 @@ function restoreSession(role) {
     }
 }
 
-// CHANGED TO ASYNC to ensure the log is saved completely before the page reloads
 async function logoutSession() {
     const roleText = sessionStorage.getItem('activeRole') === 'student' ? 'Student' : 'Admin';
     await addLog("User Logged Out", "SUCCESS", roleText);
@@ -101,7 +108,6 @@ function checkAdminLogin() {
     const enteredUser = document.getElementById('admin-username-input').value.trim();
     const enteredPass = document.getElementById('password-input').value;
     
-    // Check both Username and Password
     if (enteredUser === currentUsername && enteredPass === currentPassword) {
         failedLoginAttempts = 0;
         sessionStorage.setItem('activeRole', 'admin');
@@ -298,7 +304,6 @@ async function addLog(action, status, relatedUser = 'Admin') {
     } catch(err) { console.error(err); }
 }
 
-// NEW DEDICATED LOGS VIEW 
 function updateLogsView() {
     if(!document.getElementById('view-logs') || document.getElementById('view-logs').classList.contains('hidden')) return;
 
@@ -318,10 +323,8 @@ function updateLogsView() {
         let logDateRaw = log.timestamp.split(',')[0].trim();
         let logDateObj = new Date(logDateRaw);
 
-        // Safely map the user (prevents "undefined" from older logs)
         let safeUser = log.user && log.user !== 'undefined' ? log.user : (log.action.toLowerCase().includes('student') ? 'Student' : 'Admin');
 
-        // --- DASHBOARD METRICS GATHERING ---
         if (logDateRaw === todayStr) {
             let act = log.action.toLowerCase();
             if (act.includes('login') && log.status === 'SUCCESS') loginsToday++;
@@ -331,7 +334,6 @@ function updateLogsView() {
             if (log.status === 'DELETED') securityFlags++;
         }
 
-        // --- TABLE FILTERING LOGIC ---
         let matchSearch = log.action.toLowerCase().includes(searchQuery) || safeUser.toLowerCase().includes(searchQuery);
         
         let matchDate = true;
@@ -352,13 +354,11 @@ function updateLogsView() {
         return matchSearch && matchDate && matchType && matchRole;
     });
 
-    // Update Top Metrics
     document.getElementById('log-metric-logins').innerText = loginsToday;
     document.getElementById('log-metric-requests').innerText = requestsToday;
     document.getElementById('log-metric-processed').innerText = processedToday;
     document.getElementById('log-metric-failed').innerText = failedAttempts;
 
-    // Smart Security Alert Banner Logic
     const alertBanner = document.getElementById('security-status-banner');
     const alertTitle = document.getElementById('security-status-title');
     const alertDesc = document.getElementById('security-status-desc');
@@ -386,7 +386,6 @@ function updateLogsView() {
         alertDesc.innerHTML = 'No suspicious activities detected today.';
     }
 
-    // Render Filtered Table
     const tbody = document.getElementById('audit-table-body');
     if (filteredLogs.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 20px; color:#64748b;">No logs match your current filters.</td></tr>`;
@@ -394,20 +393,19 @@ function updateLogsView() {
     }
 
     tbody.innerHTML = filteredLogs.map(log => {
-        let badgeColor = '#10b981'; // Green Default
+        let badgeColor = '#10b981'; 
         let badgeText = 'Normal';
         
         let act = log.action.toLowerCase();
         
         if (log.status === 'SECURITY ALERT' || log.status === 'DELETED' || act.includes('failed') || act.includes('reject')) {
-            badgeColor = '#ef4444'; // Red
+            badgeColor = '#ef4444'; 
             badgeText = 'Critical';
         } else if (log.status === 'PENDING' || act.includes('password') || act.includes('updated') || act.includes('request')) {
-            badgeColor = '#f59e0b'; // Yellow
+            badgeColor = '#f59e0b'; 
             badgeText = 'Warning / Auth';
         }
 
-        // Clean user fallback again for rendering
         let displayUser = log.user && log.user !== 'undefined' ? log.user : (log.action.toLowerCase().includes('student') ? 'Student' : 'Admin');
 
         return `
@@ -431,7 +429,6 @@ function updateStudentHistory() {
 
     const myName = sessionStorage.getItem('studentName');
     
-    // Students only see requests connected to their name OR generic Student login logs
     const myLogs = auditLogs.filter(log => log.user === myName || log.user === 'Student');
     
     if(myLogs.length === 0) {
@@ -452,11 +449,9 @@ function updateStudentHistory() {
     }).join('');
 }
 
-
-// --- LIVE COUNTDOWN ENGINE (PENALTY WATCH + PROGRESS BAR) ---
+// --- LIVE COUNTDOWN ENGINE ---
 function startLiveCountdown() {
     setInterval(() => {
-        // 1. Text Update & Row Flash Logic
         document.querySelectorAll('.countdown-timer').forEach(el => {
             const returnDateStr = el.getAttribute('data-date');
             if (!returnDateStr) return;
@@ -467,7 +462,6 @@ function startLiveCountdown() {
             let tr = el.closest('tr');
 
             if (diff < 0) {
-                // OVERDUE
                 const daysOverdue = Math.ceil(Math.abs(diff) / (1000 * 60 * 60 * 24));
                 const penalty = daysOverdue * 50;
                 el.innerHTML = ` Overdue by ${daysOverdue} day(s) (₱${penalty} Penalty)`;
@@ -476,7 +470,6 @@ function startLiveCountdown() {
                 el.style.fontWeight = 'bold';
                 if(tr) tr.classList.add('row-overdue');
             } else {
-                // ACTIVE
                 if(tr) tr.classList.remove('row-overdue');
                 const days = Math.floor(diff / (1000 * 60 * 60 * 24));
                 const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -502,7 +495,6 @@ function startLiveCountdown() {
             }
         });
 
-        // 2. Visual Horizontal Progress Bar Logic
         document.querySelectorAll('.progress-fill').forEach(fill => {
             const returnDateStr = fill.getAttribute('data-date');
             if (!returnDateStr) return;
@@ -511,7 +503,6 @@ function startLiveCountdown() {
             const now = new Date().getTime();
             const diff = targetTime - now;
 
-            // Base the full bar width on a standard 7-day total borrow time
             const maxTime = 7 * 24 * 60 * 60 * 1000; 
             let percent = (diff / maxTime) * 100;
             if (percent > 100) percent = 100;
@@ -519,10 +510,10 @@ function startLiveCountdown() {
 
             fill.style.width = `${percent}%`;
 
-            if (diff < 0) fill.style.background = '#dc2626'; // Overdue Dark Red
-            else if (diff < 12 * 60 * 60 * 1000) fill.style.background = '#ef4444'; // Red
-            else if (diff < 2 * 24 * 60 * 60 * 1000) fill.style.background = '#f59e0b'; // Yellow
-            else fill.style.background = '#10b981'; // Green
+            if (diff < 0) fill.style.background = '#dc2626'; 
+            else if (diff < 12 * 60 * 60 * 1000) fill.style.background = '#ef4444'; 
+            else if (diff < 2 * 24 * 60 * 60 * 1000) fill.style.background = '#f59e0b'; 
+            else fill.style.background = '#10b981'; 
         });
 
     }, 1000);
@@ -629,7 +620,7 @@ async function checkoutCart() {
             await fetch(`${API_URL}/items/${originalItem._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(originalItem) });
 
             const batchRequest = {
-                equipment: originalItem.equipment, category: originalItem.category, description: originalItem.description, price: originalItem.price,
+                equipment: originalItem.equipment, category: originalItem.category, price: originalItem.price,
                 serials: poppedSerials, status: 'Pending Approval', borrower: studentName, returnDate: returnDate,
                 transactionId: transactionId, purpose: purpose
             };
@@ -655,7 +646,6 @@ async function checkoutCart() {
     vaultData = await itemsRes.json();
     applyFilters();
 }
-
 
 // --- ADMIN: TRANSACTIONS / REQUESTS VIEW ---
 function renderRequestsView() {
@@ -734,11 +724,15 @@ async function approveTransaction(txId) {
     if(itemsToApprove.length === 0) return;
 
     let borrowerName = itemsToApprove[0].borrower;
+    let equipmentNames = [];
+
     for (let item of itemsToApprove) {
         item.status = 'Borrowed';
+        equipmentNames.push(item.equipment);
         await fetch(`${API_URL}/items/${item._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
     }
-    addLog(`Approved batch request [${txId}] for ${borrowerName}`, "SUCCESS", borrowerName);
+    
+    addLog(`Approved batch items: ${equipmentNames.join(', ')}`, "SUCCESS", borrowerName);
     
     const itemsRes = await fetch(`${API_URL}/items`);
     vaultData = await itemsRes.json();
@@ -850,7 +844,6 @@ function applyFilters() {
         });
     }
 
-    // THIS IS WHERE THE BUTTON DESIGNS ARE RENDERED
     updateTable(filteredData);
     
     updateMaintenanceTable(); 
@@ -985,6 +978,14 @@ function updateChart() {
                 let detail = logParts.length > 1 ? logParts[1].split(' by ')[0] : log.action;
                 borrowCounts[detail] = (borrowCounts[detail] || 0) + 1;
             }
+            else if (log.action.startsWith("Approved batch items: ")) {
+                let itemsStr = log.action.replace("Approved batch items: ", "").trim();
+                let itemsArray = itemsStr.split(', ');
+                itemsArray.forEach(item => {
+                    let eqName = item.trim();
+                    if(eqName) borrowCounts[eqName] = (borrowCounts[eqName] || 0) + 1;
+                });
+            }
         });
 
         let sortedPopular = Object.keys(borrowCounts).map(name => {
@@ -1023,22 +1024,20 @@ function updateTable(dataToDisplay, role = sessionStorage.getItem('activeRole'),
     const isAdmin = (role === 'admin');
 
     thead.innerHTML = isAdmin ?
-        `<tr><th>#</th><th>Equipment</th><th>Category</th><th>Description</th><th>Qty</th><th>Encrypted Serials</th><th>Status</th><th>Action</th></tr>` :
-        `<tr><th>#</th><th>Equipment</th><th>Category</th><th>Description</th><th>Qty</th><th>Status</th><th>Action</th></tr>`;
+        `<tr><th>#</th><th>Equipment</th><th>Category</th><th>Qty</th><th>Encrypted Serials</th><th>Status</th><th>Action</th></tr>` :
+        `<tr><th>#</th><th>Equipment</th><th>Category</th><th>Qty</th><th>Status</th><th>Action</th></tr>`;
 
     list.innerHTML = "";
     dataToDisplay.forEach((item, index) => {
         let row = `<tr style="transition: background-color 0.3s;"><td>${index+1}</td><td><strong>${item.equipment}</strong></td>`;
         
         let catHtml = `<td><span style="font-size: 0.8rem; background: #e2e8f0; padding: 4px 8px; border-radius: 6px; color: #475569; white-space: nowrap;">${item.category || 'Others'}</span></td>`;
-        let descHtml = `<td>${item.description || '<span style="color:#cbd5e1;font-size:0.8rem;">No Description</span>'}</td>`;
         let qtyHtml = `<td><span style="font-weight:bold; color:var(--cit-blue); background:#e2e8f0; padding:4px 10px; border-radius:20px;">${item.serials ? item.serials.length : 0}</span></td>`;
 
         let badgeClass = 'badge-available';
         if (item.status === 'Borrowed') badgeClass = 'badge-borrowed';
         if (item.status === 'Pending Approval') badgeClass = 'badge-pending';
         
-        // NEW: Visual Progress Bar & Timer Combo
         let penaltyText = "";
         if (item.status === 'Borrowed' && item.returnDate) {
             penaltyText = `
@@ -1075,31 +1074,28 @@ function updateTable(dataToDisplay, role = sessionStorage.getItem('activeRole'),
             if (item.status === 'Pending Approval') {
                 actionHtml = `<span style="font-size:0.8rem; color:#64748b;">Check Requests Tab</span>`;
             } else if (item.status === 'Available') {
-                // RESTORED OLD BUTTON DESIGN (Matched Sizes, Delete = Blue, Report = Red)
                 actionHtml = `<button onclick="removeItem('${item._id}')" class="btn-primary" style="padding: 8px 15px; font-size: 0.85rem; width: 100%; margin-bottom: 5px;">Delete</button><br>
                               <button onclick="openReportModal('${item._id}')" class="btn-danger" style="padding: 8px 15px; font-size: 0.85rem; width: 100%;">Report Issue</button>`;
             } else {
                 actionHtml = `<button onclick="removeItem('${item._id}')" class="btn-primary" style="padding: 8px 15px; font-size: 0.85rem; width: 100%;">Delete Group</button>`;
             }
             
-            row += `${catHtml}${descHtml}${qtyHtml}${serialsHtml}
+            row += `${catHtml}${qtyHtml}${serialsHtml}
                     <td style="width: 180px;">${statusHtml}</td><td style="width: 140px;">${actionHtml}</td>`;
         } else {
             let btn = '';
             if (item.status === 'Available') {
-                // RESTORED OLD BUTTON DESIGN (Matched Sizes, No Emojis)
                 btn = `<button onclick="addToCart('${item._id}')" class="btn-primary" style="padding: 8px 15px; font-size: 0.85rem; width: 100%; margin-bottom: 5px;">Add to Bag</button><br>
                        <button onclick="openReportModal('${item._id}')" class="btn-danger" style="padding: 8px 15px; font-size: 0.85rem; width: 100%;">Report Issue</button>`;
             } else if (item.status === 'Pending Approval' && item.borrower === studentData.name) {
                 btn = `<span style="font-size: 0.8rem; color: #6366f1; font-weight: bold;">Waiting...</span>`;
             } else if (item.status === 'Borrowed' && item.borrower === studentData.name) {
-                // Return Button (Same Class/Size Template)
                 btn = `<button onclick="returnItem('${item._id}')" class="btn-secondary" style="padding: 8px 15px; font-size: 0.85rem; width: 100%;">Return</button>`;
             } else {
                 btn = `<span style="font-size: 0.8rem; color: #64748b;">Unavailable</span>`;
             }
             
-            row += `${catHtml}${descHtml}${qtyHtml}<td style="width: 180px;">${statusHtml}</td><td style="width: 140px;">${btn}</td>`;
+            row += `${catHtml}${qtyHtml}<td style="width: 180px;">${statusHtml}</td><td style="width: 140px;">${btn}</td>`;
         }
         list.innerHTML += row + "</tr>";
     });
@@ -1177,12 +1173,11 @@ function updateMaintenanceTable() {
 async function addNewItem() {
     const n = document.getElementById('item-name').value.trim();
     const s = document.getElementById('item-serial').value.trim();
-    const desc = document.getElementById('item-description').value.trim(); 
     const price = document.getElementById('item-price').value.trim();      
     const cat = document.getElementById('item-category').value; 
 
-    if (!n || !s || !desc || !price || !cat) { 
-        alert("Action Denied: Name, Serial, Description, Price, and Category are required."); 
+    if (!n || !s || !price || !cat) { 
+        alert("Action Denied: Name, Serial, Price, and Category are required."); 
         return; 
     }
 
@@ -1196,7 +1191,7 @@ async function addNewItem() {
             addLog(`Combined Serial into existing group: ${n}`, "SUCCESS", "Admin");
         } catch(err) { console.error(err); return; }
     } else {
-        const newItem = { equipment: n, category: cat, description: desc, price: Number(price), serials: [encryptedSerial], status: 'Available' };
+        const newItem = { equipment: n, category: cat, price: Number(price), serials: [encryptedSerial], status: 'Available' };
         try {
             await fetch(`${API_URL}/items`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newItem) });
             addLog(`Registered New Item Group: ${n}`, "SUCCESS", "Admin");
@@ -1208,8 +1203,7 @@ async function addNewItem() {
 
     document.getElementById('item-name').value = "";
     document.getElementById('item-serial').value = "";
-    document.getElementById('item-description').value = ""; 
-    document.getElementById('item-price').value = "";       
+    document.getElementById('item-price').value = "";        
     document.getElementById('item-category').value = ""; 
     applyFilters(); 
 }
@@ -1256,7 +1250,7 @@ async function submitBrokenReport() {
         await fetch(`${API_URL}/items/${item._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
 
         const brokenItemObj = {
-            equipment: item.equipment, category: item.category, description: item.description, price: item.price, serials: [brokenSerial],
+            equipment: item.equipment, category: item.category, price: item.price, serials: [brokenSerial],
             status: 'Maintenance', repairStatus: 'Pending', issueDescription: desc, reportedBy: reporter, dateReported: today
         };
 
@@ -1409,16 +1403,37 @@ async function saveNewPassword() {
     }
 }
 
+// --- KEYBOARD & SCROLL LISTENERS ---
+
+function handleAddItemEnter(e) { 
+    if (e.key === 'Enter') {
+        e.preventDefault(); 
+        addNewItem(); 
+    } 
+}
+
 function closeAlert() { document.getElementById('security-alert').classList.add('hidden'); }
 function openPasswordModal() { document.getElementById('password-modal').classList.remove('hidden'); }
 function closePasswordModal() { document.getElementById('password-modal').classList.add('hidden'); }
 function handleLoginEnter(e) { if(e.key === 'Enter') checkAdminLogin(); }
-function handleAddItemEnter(e) { if(e.key === 'Enter') addNewItem(); }
 function handleUpdatePasswordEnter(e) { if(e.key === 'Enter') { e.preventDefault(); saveNewPassword(); } }
 
-window.onscroll = function() { toggleScrollButton() };
 function toggleScrollButton() {
     const btn = document.getElementById("scroll-top-btn");
-    btn.style.display = (document.body.scrollTop > 200 || document.documentElement.scrollTop > 200) ? "block" : "none";
+    const mainContent = document.querySelector('.main-content');
+    
+    if (!btn || !mainContent) return;
+
+    if (mainContent.scrollTop > 200) {
+        btn.style.display = "block";
+    } else {
+        btn.style.display = "none";
+    }
 }
-function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+function scrollToTop() { 
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+        mainContent.scrollTo({ top: 0, behavior: 'smooth' }); 
+    }
+}

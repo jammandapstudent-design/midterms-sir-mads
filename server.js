@@ -8,25 +8,49 @@ const app = express();
 // --- MIDDLEWARE ---
 app.use(cors());
 app.use(express.json());
-// Serves static files if Vercel routing misses them
 app.use(express.static(path.join(__dirname))); 
 
 // --- DATABASE CONNECTION ---
-const dbURI = 'mongodb+srv://admin:admin@cluster0.gipy0hk.mongodb.net/cit_vault?appName=Cluster0';
+// Updated to use Render environment variables, falling back to local for dev
+const dbURI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/cit_vault';
 
 mongoose.connect(dbURI)
     .then(() => console.log('✅ MongoDB Connected'))
     .catch(err => console.log('❌ MongoDB Connection Error:', err));
 
 // --- SCHEMAS ---
-const Config = mongoose.model('Config', new mongoose.Schema({ pin: String }));
+// Added 'username' to the schema so the frontend receives it correctly
+const Config = mongoose.model('Config', new mongoose.Schema({ 
+    username: String, 
+    pin: String 
+}));
+
 const Item = mongoose.model('Item', new mongoose.Schema({
+    // Original Fields
     equipment: String,
     serials: [String],
     status: String,
     borrower: String,
-    returnDate: String
+    returnDate: String,
+    
+    // Core Details
+    category: String,
+    description: String,
+    price: Number,
+    transactionId: String,
+    purpose: String,
+
+    // Maintenance & Repair Fields
+    repairStatus: String,
+    issueDescription: String,
+    reportedBy: String,
+    dateReported: String,
+    sentTo: String,
+    repairCost: Number,
+    estimatedReturnDate: String,
+    maintenanceNotes: String
 }));
+
 const Log = mongoose.model('Log', new mongoose.Schema({
     action: String,
     status: String,
@@ -35,7 +59,8 @@ const Log = mongoose.model('Log', new mongoose.Schema({
 
 // --- API ROUTES ---
 app.get('/api/config', async (req, res) => {
-    let config = await Config.findOne() || await new Config({ pin: 'admin' }).save();
+    // Fixed: Now defaults to username: 'admin', pin: '1234' on fresh startup
+    let config = await Config.findOne() || await new Config({ username: 'admin', pin: '1234' }).save();
     res.json(config);
 });
 
@@ -66,9 +91,8 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- PORT (For local testing only) ---
+// --- PORT ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
 
-// CRITICAL: Export for Vercel's serverless engine
 module.exports = app;
