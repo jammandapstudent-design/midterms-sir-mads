@@ -374,14 +374,14 @@ function updateLogsView() {
         alertBanner.style.background = '#fffbeb';
         alertBanner.style.borderLeft = '5px solid #f59e0b';
         alertTitle.style.color = '#92400e';
-        alertTitle.innerHTML = '⚠️ WARNING: Elevated System Activity';
+        alertTitle.innerHTML = ' WARNING: Elevated System Activity';
         alertDesc.style.color = '#b45309';
         alertDesc.innerHTML = 'Monitor recent failed password attempts or inventory deletions.';
     } else {
         alertBanner.style.background = '#ecfdf5';
         alertBanner.style.borderLeft = '5px solid #10b981';
         alertTitle.style.color = '#065f46';
-        alertTitle.innerHTML = '🛡️ System Status: Secure';
+        alertTitle.innerHTML = ' System Status: Secure';
         alertDesc.style.color = '#047857';
         alertDesc.innerHTML = 'No suspicious activities detected today.';
     }
@@ -470,7 +470,7 @@ function startLiveCountdown() {
                 // OVERDUE
                 const daysOverdue = Math.ceil(Math.abs(diff) / (1000 * 60 * 60 * 24));
                 const penalty = daysOverdue * 50;
-                el.innerHTML = `⏳ Overdue by ${daysOverdue} day(s) (₱${penalty} Penalty)`;
+                el.innerHTML = ` Overdue by ${daysOverdue} day(s) (₱${penalty} Penalty)`;
                 el.className = 'countdown-timer pulse-red';
                 el.style.color = '#ef4444';
                 el.style.fontWeight = 'bold';
@@ -483,7 +483,7 @@ function startLiveCountdown() {
                 const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
                 const secs = Math.floor((diff % (1000 * 60)) / 1000);
                 
-                let timeText = `⏳ `;
+                let timeText = ` `;
                 if (days > 0) timeText += `${days}d `;
                 timeText += `${hours}h ${mins}m ${secs}s left`;
 
